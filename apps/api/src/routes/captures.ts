@@ -155,7 +155,7 @@ export function registerCaptureRoutes(app: FastifyInstance, ctx: AppContext) {
     }
     const target = toSignedBigInt64(phashFromHex(parsed.data.phash)).toString();
     const candidates = await ctx.sql<{ captureId: string; distance: number }[]>`
-      select id as "captureId", bit_count((phash # ${target}::bigint)::bit(64)) as distance
+      select id as "captureId", bit_count((phash # ${target}::bigint)::bit(64))::int as distance
       from captures
       where bit_count((phash # ${target}::bigint)::bit(64)) <= 14
       order by distance

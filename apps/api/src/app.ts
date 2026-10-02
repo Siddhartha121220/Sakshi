@@ -12,6 +12,7 @@ import { registerCaptureRoutes } from "./routes/captures.js";
 import { registerTimeBeaconRoute } from "./routes/time-beacon.js";
 import { registerBatchRoutes } from "./routes/batches.js";
 import { registerHealthRoute } from "./routes/health.js";
+import { registerVerificationEventRoutes } from "./routes/verification-events.js";
 
 export interface AppContext {
   config: Config;
@@ -65,6 +66,7 @@ export function buildApp(ctx: AppContext): FastifyInstance {
   registerTimeBeaconRoute(app, ctx);
   registerCaptureRoutes(app, ctx);
   registerBatchRoutes(app, ctx);
+  registerVerificationEventRoutes(app, ctx);
 
   return app;
 }

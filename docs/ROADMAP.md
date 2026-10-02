@@ -42,13 +42,13 @@ Legend: ☐ todo · ◐ in progress · ☑ done
 - ☑ Integration tests: real local Anvil + an embedded Postgres-compatible DB (no Docker, no real Postgres install needed) — covers the full register → submit → batch → anchor → confirm → finalize → verify path, multi-capture batching, duplicate-image rejection, and on-chain device revocation
 - **Exit:** met — `apps/api/scripts/fake-device.ts` submits N captures against a running API and they anchor and verify; exercised directly in the integration tests (27 tests passing) and once manually as separate OS processes (which is how the viem block-number caching bug and a `process.argv[1]` entrypoint bug were actually found — see `apps/api/README.md`'s gotchas section)
 
-## Phase 4 — Web verifier (week 4–5)
-- ☐ Drag-and-drop page; hashing in a Web Worker so large photos don't freeze the UI
-- ☐ Exact path + perceptual path + bundle-file upload
-- ☐ "How this was verified" checklist with explorer links
-- ☐ Verdict UI for all 6 verdicts (text + icon, accessible)
-- ☐ Deploy to Vercel (pointing at the staging API + Base Sepolia)
-- **Exit:** a photo from the Phase 3 fake device verifies end-to-end in the browser against Base Sepolia
+## Phase 4 — Web verifier (week 4–5) ☑ mostly done
+- ☑ Drag-and-drop page; hashing in a Web Worker so large photos don't freeze the UI
+- ☑ Exact path + perceptual path + bundle-file upload
+- ☑ "How this was verified" checklist with explorer links
+- ☑ Verdict UI for all 6 verdicts (text + icon, accessible) — `describeVerdict` in `VerdictCard.tsx`
+- ☐ Deploy to Vercel (pointing at the staging API + Base Sepolia) — not deployed; no staging API or Base Sepolia deployment exists yet (Phase 1's contract is still local/testnet-ready only, not actually deployed)
+- **Exit:** not literally met as written (no Base Sepolia deployment to point at) — instead, `apps/web/test/verify-flow.integration.test.ts` runs this app's own `chain-reader.ts` + `api-client.ts` + `verify-flow.ts` against a real local Anvil + API + worker end to end (register → submit → anchor → verify, AUTHENTIC/NO_PROVENANCE/SIMILAR_TO_AUTHENTIC/bundle-file/network-failure paths). Image decoding and the Web Worker wrapper are real-browser-API glue with no independent logic, left for a manual `pnpm dev` check rather than E2E/Playwright (see apps/web/README.md).
 
 ## Phase 5 — Android app (week 5–7)
 - ☐ Kotlin + Compose scaffold; CameraX capture screen

@@ -192,3 +192,18 @@ describe("verifyBundle: INVALID paths", () => {
     expect(result.verdict).toBe("INVALID");
   });
 });
+
+describe("verifyBundle: fileBytes = null (PROTOCOL §8.1 perceptual path, step 3)", () => {
+  it("skips the file-hash check and still verifies the bundle's own authenticity", async () => {
+    const { bundle, chain } = await makeScenario();
+    const result = await verifyBundle(null, bundle, chain);
+    expect(result.verdict).toBe("AUTHENTIC");
+  });
+
+  it("still rejects a bundle that's invalid for reasons other than the file hash", async () => {
+    const { bundle, chain } = await makeScenario();
+    const tampered: ProofBundle = { ...bundle, anchor: { ...bundle.anchor!, proof: [] } };
+    const result = await verifyBundle(null, tampered, chain);
+    expect(result.verdict).toBe("INVALID");
+  });
+});

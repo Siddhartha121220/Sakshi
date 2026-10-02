@@ -28,10 +28,12 @@ export type VerifyResult =
  * Verifies a proof bundle against an uploaded file, per docs/PROTOCOL.md §8. `chain` is read from
  * directly — never the Sakshi API — so a malicious or down API can at worst withhold a bundle, not
  * forge a verdict (docs/ARCHITECTURE.md §4, docs/THREAT_MODEL.md T10/T11).
+ *
+ * `fileBytes` is `null` for docs/PROTOCOL.md §8.1's perceptual path, step 3: "run steps 3-13 on the
+ * candidate's own bundle (without step 4)" — checking a *similar* photo's bundle for its own
+ * internal validity, not that it matches whatever file the user actually uploaded.
  */
-export async function verifyBundle(fileBytes: Uint8Array, bundle: ProofBundle, chain: ChainReader): Promise<VerifyResult> {
-  const fileHashHex = Array.from(await sha256(fileBytes), (b) => b.toString(16).padStart(2, "0")).join("");
-
+export async function verifyBundle(fileBytes: Uint8Array | null, bundle: ProofBundle, chain: ChainReader): Promise<VerifyResult> {
   const manifestBytes = fromBase64(bundle.manifest);
   const signatureDer = fromBase64(bundle.signature);
 
@@ -41,8 +43,11 @@ export async function verifyBundle(fileBytes: Uint8Array, bundle: ProofBundle, c
   }
   const { manifest } = parsed;
 
-  if (manifest.sha256 !== fileHashHex) {
-    return { verdict: "INVALID", reason: "file hash does not match manifest" };
+  if (fileBytes !== null) {
+    const fileHashHex = Array.from(await sha256(fileBytes), (b) => b.toString(16).padStart(2, "0")).join("");
+    if (manifest.sha256 !== fileHashHex) {
+      return { verdict: "INVALID", reason: "file hash does not match manifest" };
+    }
   }
 
   const publicKeySpki = fromBase64(bundle.device.publicKey);

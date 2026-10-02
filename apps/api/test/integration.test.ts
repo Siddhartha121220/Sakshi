@@ -175,6 +175,38 @@ describe("end-to-end: register, submit, anchor, verify", () => {
     expect(json.error.code).toBe("DUPLICATE_IMAGE");
   });
 
+  it("search-similar returns distance as a JSON number, not a string", async () => {
+    // Postgres's bit_count() returns bigint, which postgres.js serialises as a string unless cast —
+    // regression test for that exact mismatch (src/routes/captures.ts's explicit ::int cast).
+    await submitFakeCapture(baseUrl, await registerFakeDevice(baseUrl)); // fake-device always uses phash "0"*16
+    const res = await fetch(`${baseUrl}/v1/captures/search-similar`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ phash: "0000000000000000" }),
+    });
+    const { candidates } = (await res.json()) as { candidates: { captureId: string; distance: number }[] };
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(typeof candidates[0]!.distance).toBe("number");
+  });
+
+  it("accepts an anonymous verification event, with or without a known captureId", async () => {
+    const { captureId } = await submitFakeCapture(baseUrl, await registerFakeDevice(baseUrl));
+
+    const known = await fetch(`${baseUrl}/v1/verification-events`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ captureId, method: "exact", verdict: "authentic", hammingDistance: null }),
+    });
+    expect(known.status).toBe(204);
+
+    const unknown = await fetch(`${baseUrl}/v1/verification-events`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ captureId: null, method: "perceptual", verdict: "no_provenance", hammingDistance: null }),
+    });
+    expect(unknown.status).toBe(204);
+  });
+
   // Device registration with a genuinely bad/missing attestation is covered by
   // test/attestation.test.ts (DEV_SKIP_ATTESTATION, needed for the fake device above to register
   // at all, would make that assertion meaningless against this running app).

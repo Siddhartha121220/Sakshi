@@ -7,6 +7,7 @@ Sakshi: capture-time photo provenance. An Android app signs photo fingerprints w
 - `docs/ARCHITECTURE.md` — components, flows, key decisions (D1–D11). Don't silently reverse a decision; propose it first.
 - `docs/THREAT_MODEL.md` — check that security-relevant changes don't break a mitigation.
 - `docs/ROADMAP.md` — current phase. Mark items ☑ when done.
+- `apps/api/README.md` — non-obvious gotchas already hit once (viem's RPC caching, Anvil's fake "finalized" tag, an ASN.1 library quirk, Fastify entrypoint detection). Check it before re-debugging one of these from scratch.
 
 ## Layout
 ```
@@ -21,16 +22,17 @@ packages/core       Shared TS: protocol, pHash, merkle, verify(); test-vectors/ 
 > Filled in as each phase lands. Keep this list accurate.
 ```bash
 pnpm install                         # all TS workspaces
-docker compose up -d                 # postgres, minio, anvil
-pnpm -r test                         # all TS tests
-pnpm -r typecheck && pnpm -r lint
-pnpm --filter api db:migrate         # dbmate up
+pnpm -r test                         # all TS tests — apps/api spins up its own Anvil + embedded DB per file, no setup needed
+pnpm -r typecheck
+pnpm --filter api db:migrate         # dbmate up — real deployments only; tests don't need this
 pnpm --filter api dev                # API
 pnpm --filter api worker             # anchor worker
 pnpm --filter web dev                # verifier
 cd packages/contracts && forge test -vvv && forge coverage
 cd apps/android && ./gradlew test
 ```
+No Docker: local dev and tests use Anvil (via Foundry) directly, and `apps/api`'s tests use an
+embedded Postgres-compatible DB (see `apps/api/README.md`) — nothing left for Docker to wrap.
 
 ## Non-negotiable invariants
 1. **Signed bytes are sacred.** Store and transmit `manifest_bytes` verbatim. Never re-serialise a signed manifest, and never store it only as `jsonb`.
@@ -57,7 +59,7 @@ cd apps/android && ./gradlew test
 ## Testing expectations
 - Contracts: unit + fuzz + invariant tests; Slither clean.
 - `packages/core`: every verdict path has a positive and a negative test vector.
-- API: integration tests against real Postgres + Anvil (docker compose), not mocks of the DB.
+- API: integration tests against a real local Anvil + an embedded Postgres-compatible DB, not mocks of the DB.
 - Every bug fix gets a regression test.
 
 ## Security

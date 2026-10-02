@@ -1,0 +1,24 @@
+{
+  "name": "@sakshi/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "generate-vectors": "tsx scripts/generate-vectors.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openzeppelin/merkle-tree": "^1.0.8",
+    "canonicalize": "^5.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}

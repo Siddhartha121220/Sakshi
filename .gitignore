@@ -1,0 +1,31 @@
+# deps / builds
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+
+# foundry
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/*/31337/
+
+# android
+apps/android/.gradle/
+apps/android/local.properties
+apps/android/**/build/
+apps/android/.idea/
+*.apk
+*.aab
+
+# os / editors
+.DS_Store
+.idea/
+*.log

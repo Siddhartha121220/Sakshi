@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug-only: lets the debug build talk plaintext HTTP to a dev machine on the LAN, whatever its
+     address is (that address is per-developer — see sakshi.apiBaseUrl in local.properties). This
+     file lives in the debug source set only, so release builds never see it and stay HTTPS-only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

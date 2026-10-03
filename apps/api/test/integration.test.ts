@@ -207,6 +207,23 @@ describe("end-to-end: register, submit, anchor, verify", () => {
     expect(unknown.status).toBe(204);
   });
 
+  // Regression: the API shipped with no CORS at all, so apps/web — a static site on its own
+  // origin — could not call it from a browser even though every Node-side test passed (fetch in
+  // Node does not enforce CORS, which is exactly why this survived until a real browser tried it).
+  it("sends CORS headers so the browser verifier on another origin can call it", async () => {
+    const origin = "http://localhost:5173";
+
+    const preflight = await fetch(`${baseUrl}/v1/captures/by-hash/${"00".repeat(32)}`, {
+      method: "OPTIONS",
+      headers: { origin, "access-control-request-method": "GET" },
+    });
+    expect(preflight.status).toBeLessThan(300);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe(origin);
+
+    const actual = await fetch(`${baseUrl}/v1/captures/by-hash/${"00".repeat(32)}`, { headers: { origin } });
+    expect(actual.headers.get("access-control-allow-origin")).toBe(origin);
+  });
+
   // Device registration with a genuinely bad/missing attestation is covered by
   // test/attestation.test.ts (DEV_SKIP_ATTESTATION, needed for the fake device above to register
   // at all, would make that assertion meaningless against this running app).

@@ -11,12 +11,21 @@ Tests don't need any of this — see **Testing** below.
 
 ## Commands
 ```bash
-pnpm --filter api dev           # API server, :3000
-pnpm --filter api worker        # anchor worker (needs ANCHORER_PRIVATE_KEY)
 pnpm --filter api test          # vitest — spins up real Anvil + an embedded Postgres per file
 pnpm --filter api typecheck
 BASE_URL=http://localhost:3000 COUNT=1000 pnpm --filter api fake-device   # load-test script
 ```
+
+Running it locally against the embedded dev DB (e.g. for a real phone):
+```bash
+pnpm --filter api dev:db        # embedded Postgres; prints the DATABASE_URL to put in .env
+pnpm --filter api dev:all       # API :3000 + anchor worker, ONE process, one DB connection
+```
+**Use `dev:all`, not `dev` + `worker`.** Those two are separate processes and therefore separate
+DB connections, which the embedded dev DB can't serve (see the known limitation under Testing);
+the symptom is a confusing `read ECONNRESET` from postgres.js on whichever one connected first,
+not an error that mentions connection limits. Against real Postgres, run them separately as
+intended — that's what `src/server.ts` and `src/worker.ts` are for, and what production does.
 
 ## Testing
 No Docker, no local Postgres install required:
@@ -27,6 +36,8 @@ No Docker, no local Postgres install required:
 - **Attestation**: `test/helpers/synthetic-attestation.ts` builds a real (but self-signed, non-Google) 2-certificate chain with a genuine `KeyDescription` X.509 extension, so `attestation.ts`'s parsing and validation logic (docs/PROTOCOL.md §2.3, checks A1-A8) is exercised against real ASN.1 bytes rather than mocks. It does **not** replace testing against a real device — see docs/ROADMAP.md Phase 0.
 
 ## Gotchas hit while building this (left here so they don't get rediscovered)
+- **Real devices put `attestationApplicationId` in the SOFTWARE-enforced list, not the hardware-enforced one.** The TEE has no concept of an Android package name, so Keystore fills this in. Reading only `hardwareEnforced` made `verifyAndroidAttestation` return `WRONG_APP` for *every* genuine phone — and all 17 synthetic-chain tests passed anyway, because the synthetic builder encoded the same wrong assumption. Found only by running a captured real chain through it (`test/real-attestation.test.ts`). `rootOfTrust`, by contrast, genuinely *is* hardware-enforced.
+- **The API had no CORS**, so the browser verifier on another origin could never call it, while every Node-side test passed — `fetch` in Node doesn't enforce CORS. `@fastify/cors` is registered in `app.ts`; the regression test is in `test/integration.test.ts`.
 - **viem caches `getBlockNumber()`** for a few seconds by default. The anchor worker's finality check calls it every tick — pass `cacheTime: 0` (see `src/chain.ts`) or it'll think the chain stalled.
 - **Anvil doesn't reject `blockTag: 'finalized'`** — it silently always returns genesis. Don't rely on the RPC call throwing to detect "this chain has no real finality"; `worker.ts`'s `pollFinality` checks for a genesis-while-the-chain-has-moved-on result instead.
 - **`@peculiar/asn1-schema` deserialises some OCTET STRING fields as a bare `ArrayBuffer` instead of the `OctetString` wrapper**, inconsistently by nesting depth (confirmed empirically, not documented anywhere obvious) — `attestation.ts`'s `octetBytes()` helper handles both shapes.

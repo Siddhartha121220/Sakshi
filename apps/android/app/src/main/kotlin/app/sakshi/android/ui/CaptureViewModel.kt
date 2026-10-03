@@ -46,6 +46,9 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 .onSuccess { _registration.value = RegistrationState.Registered }
                 .onFailure { _registration.value = RegistrationState.Failed(it.message ?: "registration failed") }
         }
+        // Refresh pending captures' statuses on open, not just right after a new capture — the
+        // 15-minute periodic WorkManager schedule is too slow for "I just reopened the app".
+        UploadWorker.runNow(application)
     }
 
     /** FR-M4: capture -> hash -> sign, target < 500ms (excluding the optional network beacon

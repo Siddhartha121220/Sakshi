@@ -162,7 +162,14 @@ export async function verifyAndroidAttestation(input: VerifyAttestationInput): P
   }
 
   // A7: this is our genuine app (package name + an allowed signing cert digest).
-  const appIdBytes = keyDescription.hardwareEnforced.attestationApplicationId;
+  // Real devices put attestationApplicationId in the SOFTWARE-enforced list, not the hardware one:
+  // the TEE has no idea what an Android package name is, so the Keystore daemon fills this in. It's
+  // still covered by the hardware key's signature over the whole KeyDescription — it just means the
+  // Android system asserts it rather than the secure hardware, which A6 (locked bootloader +
+  // verified boot) is what makes trustworthy. Checked hardware-first anyway, since the schema
+  // permits either and a device that does enforce it in hardware shouldn't be penalised.
+  const appIdBytes =
+    keyDescription.hardwareEnforced.attestationApplicationId ?? keyDescription.softwareEnforced.attestationApplicationId;
   if (!appIdBytes) return { ok: false, reason: "WRONG_APP" };
   const appIdCheck = checkAttestationApplicationId(
     octetBytes(appIdBytes),

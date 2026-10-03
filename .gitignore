@@ -29,3 +29,7 @@ apps/android/.idea/
 .DS_Store
 .idea/
 *.log
+
+# ad-hoc capture pulled off a device for manual verification (see apps/android/app/README.md)
+/capture.jpg
+/*.sakshi.json

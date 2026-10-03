@@ -60,7 +60,7 @@ export function registerDeviceRoutes(app: FastifyInstance, ctx: AppContext) {
           ${Buffer.from(publicKeySpki)},
           ${Buffer.from(keyHash)},
           ${result.securityLevel},
-          ${attestationChainDer.map((c) => Buffer.from(c))},
+          ${ctx.sql.array(attestationChainDer.map((c) => Buffer.from(c)))}::bytea[],
           ${ctx.sql.json({})},
           ${appVersion}
         )

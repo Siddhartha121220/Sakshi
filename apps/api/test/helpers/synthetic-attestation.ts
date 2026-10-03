@@ -2,6 +2,15 @@
 // a real KeyDescription extension) so attestation.ts's parsing and chain-validation logic can be
 // unit-tested without a real device. This does NOT chain to Google's real roots — tests inject
 // the fake root via verifyAndroidAttestation's `trustedRootPems` override.
+//
+// Know what this can't tell you: it encodes OUR reading of the Android schema, so wherever that
+// reading is wrong, the fixture agrees with the bug and the tests stay green. That happened once
+// already — this helper puts attestationApplicationId in the hardware-enforced list, real Keystore
+// puts it in the software-enforced one, and the 17 tests here passed against code that rejected
+// every real phone. Treat test/real-attestation.test.ts (a captured real-hardware chain) as the
+// authority on what devices actually emit; this helper is for exercising branches that one chain
+// can't reach. Keeping appId hardware-enforced here is now deliberate: between the two files both
+// placements stay covered.
 import "reflect-metadata";
 import { X509Certificate, X509CertificateGenerator, Extension, cryptoProvider } from "@peculiar/x509";
 import { AsnConvert, OctetString } from "@peculiar/asn1-schema";

@@ -8,7 +8,19 @@ JSON, signature encoding) — see `../protocol/README.md`.
 ## Commands
 ```bash
 ./gradlew :app:assembleDebug   # builds a real installable APK
+adb install app/build/outputs/apk/debug/app-debug.apk
 ```
+
+### Pointing the debug build at your API
+The debug build's API base URL comes from `apps/android/local.properties` (gitignored, so each
+developer's own address stays out of the repo):
+```properties
+sakshi.apiBaseUrl=http://192.168.1.42:3000   # your dev machine's LAN IP
+```
+Defaults to `http://10.0.2.2:3000` (the host loopback as seen from an **emulator**) when unset — a
+real phone can't reach that, so a physical device needs the LAN IP and must be on the same network.
+The debug source set also permits cleartext HTTP (`src/debug/res/xml/network_security_config.xml`);
+release builds don't include that file and stay HTTPS-only.
 No unit/instrumented test suite here yet (see **What's verified** below) — `:protocol`'s tests are
 what covers the byte-level logic this module calls into.
 
@@ -23,25 +35,42 @@ what covers the byte-level logic this module calls into.
 | `ui/` | Compose: `CaptureScreen` (camera), `CaptureListScreen` (status + share), `CaptureViewModel` |
 
 ## What's verified, and what isn't
-**Verified:**
-- `:protocol`'s logic (everything this module signs/hashes) — 24 tests against the same golden
-  vectors `packages/core` uses, including this module's exact `CaptureManifest` field layout.
-- **The whole app compiles and packages into a real, installable APK** via a from-scratch
-  `./gradlew clean :app:assembleDebug` — every file in this module, the manifest, resources, and
-  every third-party dependency's version actually resolve and link together (see the "Gotchas"
-  section below for two dependency-resolution dead ends that didn't).
+**Verified on a real phone (OnePlus CPH2381, 2026-10-03):**
+- `DeviceKeyManager` generates a genuine hardware-backed P-256 key and a real 4-certificate Key
+  Attestation chain that chains to Google's Hardware Attestation Root. StrongBox was unavailable,
+  so it fell back to TEE exactly as designed. The captured chain is fixtured at
+  `apps/api/test/fixtures/real-attestation-oneplus-cph2381.json`.
+- The full flow end to end: in-app capture -> sign -> upload -> Merkle batch -> anchor on a local
+  Anvil chain -> `finalized` -> **AUTHENTIC** in the web verifier.
+- CameraX capture, Room persistence, the WorkManager upload queue, and status polling all ran.
 
-**Not verified — this module has not run on a device or emulator at all:**
-- Whether `DeviceKeyManager` actually generates a StrongBox/TEE key and a real attestation chain
-  on real hardware (docs/ROADMAP.md Phase 0's spike, which this project still owes).
-- The Compose UI rendering, CameraX capture pipeline, Room database, WorkManager scheduling, and
-  the full register -> capture -> upload -> finalize flow end to end on a device.
-- I attempted to set up a local emulator in this environment specifically to close that gap — Dev
-  tools are present (Android Studio, SDK, KVM access) but the one locally-present system image
-  (`android-37.0/google_apis_playstore_ps16k/x86_64`) turned out to be an empty placeholder (no
-  actual system image files, ~16KB total), and downloading a real one is multiple GB. That's an
-  environment limitation, not a code issue — the fix is running this on a real phone or a properly
-  provisioned emulator, which is exactly docs/ROADMAP.md Phase 0's outstanding spike.
+**Verified by build, not by running:**
+- `:protocol`'s logic — 24 tests against the same golden vectors `packages/core` uses.
+- The APK builds from a from-scratch `./gradlew clean :app:assembleDebug`.
+
+**Still not verified:**
+- **Any second device or OEM.** One phone can't tell you which of its behaviours are universal;
+  docs/ROADMAP.md Phase 0 asks for 3+.
+- **StrongBox.** This device didn't have it, so that branch and the `strongbox` security level
+  have never executed.
+- **Registration with attestation actually enforced.** The run used `DEV_SKIP_ATTESTATION=true`, so
+  the server accepted the device without checking its chain. The chain is real and now verifies
+  offline in `apps/api/test/real-attestation.test.ts`, but the live path hasn't rejected or
+  accepted a real device on its own merits yet.
+- **The share sheet / bundle export UI** — the proof bundle was pulled over ADB instead.
+- Opt-in location, and the Compose UI beyond the capture and list screens.
+
+## Getting a capture off the device
+Photos deliberately never reach the gallery (invariant #5 — there is no gallery path in or out),
+so pull them over ADB. They live in the app's private cache; the proof bundle sits beside them:
+```bash
+adb shell run-as app.sakshi ls cache/                    # sakshi-capture-<epochMillis>.jpg
+adb exec-out run-as app.sakshi cat cache/<name>.jpg > capture.jpg
+adb shell run-as app.sakshi ls files/bundles/            # <sha256>.sakshi.json
+```
+`adb pull` can't reach app-private storage on a non-rooted device, and `run-as ... cp` into
+`/sdcard/` is blocked by scoped storage — piping through `exec-out cat` is what works. Check the
+pulled file's size matches the device's before blaming anything downstream.
 
 ## Gotchas hit while building this (left here so they don't get rediscovered)
 - **`com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter`'s Gradle variant

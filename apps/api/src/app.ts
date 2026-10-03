@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import cors from "@fastify/cors";
 import type { Config } from "./config.js";
 import type { Sql } from "./db.js";
 import type { Logger } from "./logger.js";
@@ -38,9 +39,16 @@ export function buildApp(ctx: AppContext): FastifyInstance {
   // poisons every route's generics, which isn't worth it for logging we don't otherwise need.
   const app = Fastify();
 
+  // The web verifier (apps/web) is a static site running on its own origin and calls these routes
+  // directly from the browser — invariant #6 (it trusts the chain, not the API), but it still needs
+  // CORS to fetch bundles/report events. Everything here is public, read-mostly data anyway.
+  void app.register(cors, { origin: true });
+
   // Capture the exact raw request bytes (needed for docs/PROTOCOL.md §9's body-hash check) while
-  // still handing Fastify a parsed object, via a custom content-type parser.
-  app.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, body, done) => {
+  // still handing Fastify a parsed object, via a custom content-type parser. Also covers
+  // text/plain: the Android client's Retrofit scalars converter sends JSON bodies under that
+  // content type (it only serializes/deserializes Strings), and the raw bytes are JSON either way.
+  app.addContentTypeParser(["application/json", "text/plain"], { parseAs: "buffer" }, (req, body, done) => {
     req.rawBody = body as Buffer;
     if (body.length === 0) return done(null, undefined);
     try {

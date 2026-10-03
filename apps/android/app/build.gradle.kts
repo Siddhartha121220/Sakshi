@@ -1,3 +1,7 @@
+// Explicit: inside a Gradle Kotlin DSL script, a bare `java` resolves to the Java plugin extension
+// and shadows the java.* packages, so `java.util.Properties` doesn't compile.
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,6 +9,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21"
     id("com.google.devtools.ksp")
 }
+
+// Per-developer, so it lives in local.properties (gitignored), not in this file.
+val devApiBaseUrl: String = rootProject.file("local.properties")
+    .takeIf { it.exists() }
+    ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
+    ?.getProperty("sakshi.apiBaseUrl")
+    ?: "http://10.0.2.2:3000"
 
 android {
     namespace = "app.sakshi.android"
@@ -21,7 +32,10 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3000\"") // emulator -> host loopback
+            // A real phone needs the dev machine's LAN IP; 10.0.2.2 is the host loopback and only
+            // works from an emulator. That address is per-machine, so it lives in local.properties
+            // (gitignored) rather than here: sakshi.apiBaseUrl=http://192.168.x.x:3000
+            buildConfigField("String", "API_BASE_URL", "\"$devApiBaseUrl\"")
         }
         release {
             isMinifyEnabled = false

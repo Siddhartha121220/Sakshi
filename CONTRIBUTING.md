@@ -26,14 +26,19 @@ pnpm install                         # all TS workspaces
 pnpm -r test                         # all TS tests — apps/api spins up its own Anvil + embedded DB per file, no setup needed
 pnpm -r typecheck
 pnpm --filter api db:migrate         # dbmate up — real deployments only; tests don't need this
-pnpm --filter api dev                # API
-pnpm --filter api worker             # anchor worker
-pnpm --filter web dev                # verifier
+pnpm --filter api dev:db             # embedded dev Postgres; prints the DATABASE_URL for .env
+pnpm --filter api dev:all            # API + anchor worker in ONE process (see below)
+pnpm --filter web dev                # verifier (needs apps/web/.env.local — see .env.example)
 cd packages/contracts && forge test -vvv && forge coverage
 cd apps/android && ./gradlew :protocol:test && ./gradlew :app:assembleDebug
 ```
 No Docker: local dev and tests use Anvil (via Foundry) directly, and `apps/api`'s tests use an
 embedded Postgres-compatible DB (see `apps/api/README.md`) — nothing left for Docker to wrap.
+
+Locally, run `dev:all`, **not** `api dev` + `api worker`: the embedded dev DB serves one connection,
+and two processes against it fail with a bare `read ECONNRESET` that names nothing useful. Separate
+processes (`src/server.ts` / `src/worker.ts`) are correct against real Postgres, which is what
+production runs.
 
 ## Non-negotiable invariants
 1. **Signed bytes are sacred.** Store and transmit `manifest_bytes` verbatim. Never re-serialise a signed manifest, and never store it only as `jsonb`.
@@ -62,6 +67,7 @@ embedded Postgres-compatible DB (see `apps/api/README.md`) — nothing left for 
 - `packages/core`: every verdict path has a positive and a negative test vector.
 - API: integration tests against a real local Anvil + an embedded Postgres-compatible DB, not mocks of the DB.
 - Every bug fix gets a regression test.
+- **A fixture you generated cannot falsify your own assumption.** The first real-device run (2026-10-03) found three bugs that a 155-test suite was structurally incapable of catching: the synthetic attestation chain shared the code's misreading of the Android schema; Node's `fetch` doesn't enforce CORS, so no API test could miss it; and "browser glue with no logic" was left untested and broke every upload. When something is only ever exercised against our own model of an external system — a device, a browser, a wire format — say so where it's tested, and treat a captured real sample as the authority the moment one exists.
 
 ## Security
 - Never commit secrets. `.env.example` lists variable names only.

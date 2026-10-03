@@ -50,14 +50,25 @@ Legend: ☐ todo · ◐ in progress · ☑ done
 - ☐ Deploy to Vercel (pointing at the staging API + Base Sepolia) — not deployed; no staging API or Base Sepolia deployment exists yet (Phase 1's contract is still local/testnet-ready only, not actually deployed)
 - **Exit:** not literally met as written (no Base Sepolia deployment to point at) — instead, `apps/web/test/verify-flow.integration.test.ts` runs this app's own `chain-reader.ts` + `api-client.ts` + `verify-flow.ts` against a real local Anvil + API + worker end to end (register → submit → anchor → verify, AUTHENTIC/NO_PROVENANCE/SIMILAR_TO_AUTHENTIC/bundle-file/network-failure paths). Image decoding and the Web Worker wrapper are real-browser-API glue with no independent logic, left for a manual `pnpm dev` check rather than E2E/Playwright (see apps/web/README.md).
 
-## Phase 5 — Android app (week 5–7)
-- ☐ Kotlin + Compose scaffold; CameraX capture screen
-- ☐ Keystore key generation + registration flow (reusing the Phase 0 spike)
-- ☐ Kotlin implementation of hashing, pHash, JCS, signing, **passing the shared test vectors**
-- ☐ Room DB + WorkManager upload queue (offline-first)
-- ☐ Time-beacon refresh; status polling; bundle export; "share as file"
-- ☐ Opt-in location
-- **Exit:** a real photo taken on a real phone shows ✅ on the website; a WhatsApp-forwarded copy shows 🟦 *similar*
+## Phase 5 — Android app (week 5–7) ☑ written and building; ☐ unverified on a device
+- ☑ Kotlin + Compose scaffold; CameraX capture screen
+- ☑ Keystore key generation + registration flow — written per docs/PROTOCOL.md §2.2/§2.1; **still
+  needs Phase 0's outstanding real-device spike**, not yet reused since that spike hasn't happened
+- ☑ Kotlin implementation of hashing, pHash, JCS, signing, **passing the shared test vectors** — a
+  new `apps/android/protocol` module (pure JVM, no Android dependency), 24/24 tests passing against
+  the exact JSON files `packages/core`'s tests use. One confirmed (not hypothetical) floating-point
+  edge case on a numerically-degenerate synthetic image — see `CONTRIBUTING.md` invariant #8.
+- ☑ Room DB + WorkManager upload queue (offline-first) — written, not yet run
+- ☑ Time-beacon refresh; status polling; bundle export; "share as file" — written, not yet run
+- ☑ Opt-in location — written, not yet run
+- **Exit:** not met. A real photo on a real phone has not been taken — this project doesn't have
+  physical device access. What *is* true: `apps/android/app` compiles and packages into a real,
+  installable APK from a from-scratch `./gradlew clean :app:assembleDebug` (confirmed, not assumed
+  — see `apps/android/app/README.md`). An attempt was made to close the gap with a local emulator
+  (hardware virtualization and the Android SDK are both present); it stopped at a missing system
+  image (an empty placeholder, not a quick fix) rather than a code problem. **Running this on an
+  actual phone, or a properly provisioned emulator, is the single most valuable next step before
+  calling Sakshi demo-ready** — see Phase 0's spike, which this depends on.
 
 ## Phase 6 — Albums and publishing (week 7–8)
 - ☐ API + app: albums, share links, publish/unpublish originals (MinIO/R2)

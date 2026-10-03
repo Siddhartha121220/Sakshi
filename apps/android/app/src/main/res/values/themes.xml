@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window theme only — all actual UI is Compose (MainActivity's SakshiTheme). -->
+    <style name="Theme.Sakshi" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

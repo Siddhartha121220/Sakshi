@@ -11,7 +11,8 @@ Sakshi: capture-time photo provenance. An Android app signs photo fingerprints w
 
 ## Layout
 ```
-apps/android        Kotlin, Compose, CameraX, Keystore (Gradle)
+apps/android/protocol  Pure-Kotlin/JVM port of packages/core — plain `gradle test`, no emulator
+apps/android/app       Kotlin, Compose, CameraX, Keystore, Room, WorkManager — see its README for what's verified
 apps/api            Fastify API + anchor worker (src/worker.ts); db/migrations = schema source of truth
 apps/web            React + Vite static verifier
 packages/contracts  Foundry: SakshiAnchor.sol
@@ -29,7 +30,7 @@ pnpm --filter api dev                # API
 pnpm --filter api worker             # anchor worker
 pnpm --filter web dev                # verifier
 cd packages/contracts && forge test -vvv && forge coverage
-cd apps/android && ./gradlew test
+cd apps/android && ./gradlew :protocol:test && ./gradlew :app:assembleDebug
 ```
 No Docker: local dev and tests use Anvil (via Foundry) directly, and `apps/api`'s tests use an
 embedded Postgres-compatible DB (see `apps/api/README.md`) — nothing left for Docker to wrap.
@@ -42,7 +43,7 @@ embedded Postgres-compatible DB (see `apps/api/README.md`) — nothing left for 
 5. **No gallery import** in the Android app, anywhere. Signing happens only in the capture callback.
 6. **The verifier trusts the chain, not our API.** The web app reads roots, revocations, and block hashes from its own RPC. The API only delivers bundles.
 7. **The perceptual path never returns `AUTHENTIC`.** Only `SIMILAR_TO_AUTHENTIC`.
-8. **Kotlin and TS must agree byte-for-byte.** Any hashing or encoding change needs updated vectors in `packages/core/test-vectors/`, passing on both sides.
+8. **Kotlin and TS must agree byte-for-byte.** Any hashing or encoding change needs updated vectors in `packages/core/test-vectors/`, passing on both sides. One confirmed exception, not a bug: pHash on a numerically-degenerate synthetic image (all DCT coefficients near the float noise floor) can flip a handful of bits between Java's and V8's `cos()` — see `apps/android/protocol/src/test/kotlin/.../PHashTest.kt`'s `KNOWN_FLOATING_POINT_EDGE_CASES`. Real photos don't hit this; three of the four shared vectors (including ones with real structure) match bit-for-bit.
 9. **The contract is non-upgradeable and append-only.** No proxies, no functions that edit or delete batches.
 10. **Capture status is derived** (`batch_id IS NULL` = pending). Don't add a status column to `captures`.
 

@@ -65,6 +65,11 @@ link carries only the hash (`src/lib/proof-link.ts`).
   unoriented decode. That fallback is defensive — it has not been observed to fire.
 
 ## Deploying
+Live setup: `.github/workflows/deploy-web.yml` builds and publishes to GitHub Pages on every push to
+`main` (repo Settings > Pages > Source: GitHub Actions, once). It points at the hosted API and the
+Base Sepolia contract; those values are public by design. `VITE_BASE=/Sakshi/` because a project site is
+served under the repo name.
+
 Static build, no server component:
 ```bash
 pnpm --filter web build   # outputs apps/web/dist/

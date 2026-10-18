@@ -1,0 +1,54 @@
+# Builds the static verifier (apps/web) and publishes it to GitHub Pages on every push to main.
+# One-time setup: repo Settings > Pages > Build and deployment > Source: "GitHub Actions".
+name: Deploy verifier to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/web/**", "packages/core/**", "pnpm-lock.yaml", ".github/workflows/deploy-web.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # All public by design: the verifier is a static page anyone can read, and it trusts the chain,
+      # not these values' secrecy (CONTRIBUTING.md invariant 6). The contract is live on Base Sepolia.
+      VITE_BASE: /Sakshi/
+      VITE_API_BASE_URL: https://sakshi-65ve.onrender.com
+      VITE_CHAIN_ID: "84532"
+      VITE_RPC_URL: https://sepolia.base.org
+      VITE_SAKSHI_ANCHOR_CONTRACT: "0xf412dE9954A9d8caa35a0B6c1c6E193703765B51"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # `build` typechecks first. Tests aren't run here: the web suite includes an integration test that
+      # needs a local Anvil + API, which belongs in a full CI job (docs/ROADMAP.md), not the deploy.
+      - run: pnpm --filter web build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

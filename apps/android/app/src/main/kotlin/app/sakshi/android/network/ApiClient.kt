@@ -20,8 +20,12 @@ val sakshiJson: Json = Json {
 fun createSakshiApi(currentBaseUrl: () -> String, debug: Boolean): SakshiApi {
     val client = OkHttpClient.Builder()
         .addInterceptor(BaseUrlInterceptor(currentBaseUrl))
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        // Generous on purpose: free hosting tiers (e.g. Render) sleep when idle and take ~50 s to answer
+        // the first request. A 15 s read timeout made every upload against a sleeping server fail with
+        // "timeout" — and the request that timed out was the one waking it. Uploads run in the
+        // background, so waiting is cheap; a dead server still fails, just later.
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
         .apply {
             if (debug) addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
         }

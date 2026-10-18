@@ -120,6 +120,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
     fun testConnection(onResult: (String) -> Unit) {
         viewModelScope.launch {
+            onResult("Contacting the server… (a free server that's asleep can take up to a minute to wake)")
             onResult(repository.checkServer().getOrElse { "Can't reach the server: ${it.message ?: it.javaClass.simpleName}" })
         }
     }

@@ -27,6 +27,16 @@ the symptom is a confusing `read ECONNRESET` from postgres.js on whichever one c
 not an error that mentions connection limits. Against real Postgres, run them separately as
 intended — that's what `src/server.ts` and `src/worker.ts` are for, and what production does.
 
+## Deploying (e.g. Render + Neon)
+- **Database:** `DATABASE_URL=<direct url> pnpm --filter api db:migrate`. Use the **direct** connection,
+  not a pooled one (Neon's `-pooler` host): the worker's single-anchorer guarantee is a session-level
+  advisory lock, which transaction poolers don't preserve.
+- **Server:** `pnpm --filter api start` runs the API and the anchor worker in one process
+  (`src/serve-all.ts`), for hosts with no free background workers. Listens on `$PORT`.
+- **Install with dev dependencies** (`pnpm install --prod=false`): the server runs TypeScript via `tsx`,
+  and hosts that apply `NODE_ENV=production` at build time would otherwise skip it.
+- Smoke-tested in production mode against Neon on 2026-10-18 (SSL, health, beacon, challenge).
+
 ## Testing
 No Docker, no local Postgres install required:
 - **Chain**: `test/helpers/anvil.ts` spawns a real local Anvil per test file and deploys `SakshiAnchor` from the Foundry build artifact (`packages/contracts/out/`) via viem — run `forge build` there first if it's missing.

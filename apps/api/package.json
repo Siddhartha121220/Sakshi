@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev:db": "tsx scripts/dev-db.ts",
-    "dev:all": "tsx scripts/dev-server.ts",
+    "dev:all": "tsx src/serve-all.ts",
+    "start": "tsx src/serve-all.ts",
     "dev": "tsx watch src/server.ts",
     "worker": "tsx src/worker.ts",
     "fake-device": "tsx scripts/fake-device.ts",
-    "db:migrate": "dbmate up",
+    "db:migrate": "dbmate --no-dump-schema up",
     "db:rollback": "dbmate down",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

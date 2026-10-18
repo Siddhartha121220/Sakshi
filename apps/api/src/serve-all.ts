@@ -1,13 +1,17 @@
-// Dev-only: runs the API and the anchor worker in one process on one shared `sql` connection.
-// In production they're separate processes (src/server.ts / src/worker.ts) against real Postgres,
-// which handles concurrent connections fine — this only exists because the embedded PGlite dev DB
-// (scripts/dev-db.ts) can't reliably serve two independently-connecting processes at once.
-import { loadConfig } from "../src/config.js";
-import { createLogger } from "../src/logger.js";
-import { createDb } from "../src/db.js";
-import { createViemPublicClient, createChainReader, createAnchorWalletClient } from "../src/chain.js";
-import { buildApp } from "../src/app.js";
-import { runAnchorTick } from "../src/worker.js";
+// The API and the anchor worker in ONE process on one shared `sql` connection pool. Used where a second
+// process isn't available or wanted:
+//  - locally, because the embedded PGlite dev DB (scripts/dev-db.ts) can't serve two separately
+//    connecting processes;
+//  - on hosts whose free tier has no background workers (e.g. Render). There the worker only runs
+//    while the web service is awake; captures queued while it sleeps get anchored on the next wake.
+// With real Postgres and room for two processes, src/server.ts + src/worker.ts separately is equivalent;
+// the worker's advisory lock keeps it to one anchoring instance either way.
+import { loadConfig } from "./config.js";
+import { createLogger } from "./logger.js";
+import { createDb } from "./db.js";
+import { createViemPublicClient, createChainReader, createAnchorWalletClient } from "./chain.js";
+import { buildApp } from "./app.js";
+import { runAnchorTick } from "./worker.js";
 
 const config = loadConfig();
 const logger = createLogger(config);

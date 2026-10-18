@@ -147,7 +147,7 @@ sed -i "s|^DATABASE_URL=.*|DATABASE_URL=$DB_URL|" "$API_ENV"
 echo "    $DB_URL"
 
 step "4/5  API + anchor worker (one process — the embedded DB serves one connection)"
-start api "$LOGS/api.log" "$ROOT/apps/api" bash -c 'set -a; . ./.env; set +a; exec ./node_modules/.bin/tsx scripts/dev-server.ts'
+start api "$LOGS/api.log" "$ROOT/apps/api" bash -c 'set -a; . ./.env; set +a; exec ./node_modules/.bin/tsx src/serve-all.ts'
 api_up() { curl -s -o /dev/null "http://127.0.0.1:3000/v1/captures/by-hash/$(printf '0%.0s' $(seq 64))"; }
 wait_for "API" 40 api_up
 

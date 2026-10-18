@@ -80,6 +80,10 @@ Legend: ☐ todo · ◐ in progress · ☑ done
   a proper bottom navigation bar, and a retry action when registration fails. Wireless adb documented
   in `demo.sh` (`--phone SERIAL`), not yet tried on a device; the API answering on the laptop's Wi-Fi
   address was checked
+- ☑ Capture list: photo thumbnails (downsampled, EXIF-rotated), a four-step progress track (Signed →
+  Uploaded → Anchored → Verified on-chain) with a plain next-step line, pull-to-refresh that syncs
+  immediately, and a hint explaining which send button keeps AUTHENTIC. Logic unit-tested; the screens
+  themselves not yet looked at on a device
 - ☑ `scripts/demo.sh` — one command for the whole local demo (chain, deploy, DB, API + worker, web, phone
   over USB via `adb reverse`, so phone and laptop needn't share a network)
 - ☑ Opt-in location — written, not yet run

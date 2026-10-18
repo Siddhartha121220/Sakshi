@@ -53,6 +53,13 @@ class CaptureRepository(
         Beacon(chainId = response.chainId, blockNumber = response.blockNumber, blockHash = response.blockHash)
     }.getOrNull()
 
+    /** Pull-to-refresh: push anything still queued, then pull fresh statuses — same work as the
+     *  background worker, but awaited, so the UI can show when it's done. */
+    suspend fun syncNow() {
+        uploadPending()
+        refreshStatuses()
+    }
+
     /** Settings' "Test connection": reaches the server and reports which chain it anchors to. */
     suspend fun checkServer(): Result<String> = runCatching {
         val beacon = sakshiJson.decodeFromString<TimeBeaconResponse>(api.getTimeBeacon())

@@ -36,6 +36,20 @@ object ImageDecode {
         return PHash.RgbImage(width, height, rgb)
     }
 
+    /** A small, correctly rotated preview of a capture for the list, or null if the file is gone or
+     *  unreadable. Decodes at a reduced sample size: never the full 12-megapixel photo per row. */
+    fun thumbnail(path: String, targetPx: Int): Bitmap? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = app.sakshi.android.ui.thumbnailSampleSize(bounds.outWidth, bounds.outHeight, targetPx)
+        }
+        val decoded = BitmapFactory.decodeFile(path, opts) ?: return null
+        val orientation = ExifInterface(path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        applyExifOrientation(decoded, orientation)
+    }.getOrNull()
+
     private fun applyExifOrientation(bitmap: Bitmap, orientation: Int): Bitmap {
         val matrix = Matrix()
         when (orientation) {

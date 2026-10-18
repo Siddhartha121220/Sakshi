@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                     val processing by viewModel.processing.collectAsState()
                     val captures by viewModel.captures.collectAsState()
                     val serverUrl by viewModel.serverUrl.collectAsState()
+                    val refreshing by viewModel.refreshing.collectAsState()
 
                     Scaffold(
                         bottomBar = {
@@ -122,6 +123,8 @@ class MainActivity : ComponentActivity() {
                                         )
                                         else -> CaptureListScreen(
                                             captures = captures,
+                                            refreshing = refreshing,
+                                            onRefresh = viewModel::refresh,
                                             onSendPhoto = { capture, asFile -> sendPhoto(java.io.File(capture.photoFilePath), asFile) },
                                             onShare = { capture ->
                                                 viewModel.exportAndShare(

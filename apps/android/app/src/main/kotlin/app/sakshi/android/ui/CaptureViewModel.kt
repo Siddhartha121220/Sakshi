@@ -42,6 +42,9 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     private val _registration = MutableStateFlow<RegistrationState>(RegistrationState.Checking)
     val registration: StateFlow<RegistrationState> = _registration
 
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing
+
     private val _processing = MutableStateFlow(false)
     val processing: StateFlow<Boolean> = _processing
 
@@ -61,6 +64,20 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             attempt()
                 .onSuccess { _registration.value = RegistrationState.Registered }
                 .onFailure { _registration.value = RegistrationState.Failed(it.message ?: "registration failed") }
+        }
+    }
+
+    /** Pull-to-refresh on the capture list. Network failures just end the spinner: each capture's own
+     *  lastError already says what went wrong, and the background worker keeps retrying. */
+    fun refresh() {
+        if (_refreshing.value) return
+        viewModelScope.launch {
+            _refreshing.value = true
+            try {
+                runCatching { repository.syncNow() }
+            } finally {
+                _refreshing.value = false
+            }
         }
     }
 

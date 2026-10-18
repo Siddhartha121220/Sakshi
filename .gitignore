@@ -33,3 +33,7 @@ apps/android/.idea/
 # ad-hoc capture pulled off a device for manual verification (see apps/android/app/README.md)
 /capture.jpg
 /*.sakshi.json
+
+# persisted embedded dev DB (apps/api/scripts/dev-db.ts) and local chain state (scripts/demo.sh)
+apps/api/.devdb/
+.devchain/

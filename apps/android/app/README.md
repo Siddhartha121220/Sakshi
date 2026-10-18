@@ -13,7 +13,10 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 ### Easiest: the demo script
 `scripts/demo.sh` (repo root) starts the chain, deploys the contract, starts the DB, API + worker and
-web verifier, runs `adb reverse tcp:3000 tcp:3000`, and resets + reinstalls the app. With the debug URL
+web verifier, runs `adb reverse tcp:3000 tcp:3000`, and updates the app in place (`adb install -r`, so its
+registration and captures are kept). Chain and DB persist between runs; `--reset` wipes them, after
+which the app sees `UNKNOWN_DEVICE` and re-registers by itself (captures signed before that are marked
+failed with a clear reason — they can't be accepted under a new key). With the debug URL
 set to `http://127.0.0.1:3000` (below) the phone reaches the laptop **over the USB cable**, so the two
 don't need to share a network and the laptop's IP can change freely.
 

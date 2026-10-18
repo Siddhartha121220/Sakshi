@@ -18,7 +18,7 @@ BASE_URL=http://localhost:3000 COUNT=1000 pnpm --filter api fake-device   # load
 
 Running it locally against the embedded dev DB (e.g. for a real phone):
 ```bash
-pnpm --filter api dev:db        # embedded Postgres; prints the DATABASE_URL to put in .env
+pnpm --filter api dev:db        # embedded Postgres, persisted in apps/api/.devdb, fixed port 54329
 pnpm --filter api dev:all       # API :3000 + anchor worker, ONE process, one DB connection
 ```
 **Use `dev:all`, not `dev` + `worker`.** Those two are separate processes and therefore separate

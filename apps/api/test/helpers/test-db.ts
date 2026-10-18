@@ -27,7 +27,14 @@ export interface TestDb {
   close(): Promise<void>;
 }
 
-export async function createTestDb(): Promise<TestDb> {
+export interface TestDbOptions {
+  /** Persist to this directory instead of memory (scripts/dev-db.ts). Tests leave it unset. */
+  dataDir?: string;
+  /** Listen on a fixed port instead of a random free one. */
+  port?: number;
+}
+
+export async function createTestDb(opts: TestDbOptions = {}): Promise<TestDb> {
   const migrationPath = join(
     dirname(fileURLToPath(import.meta.url)),
     "..",
@@ -39,10 +46,12 @@ export async function createTestDb(): Promise<TestDb> {
   const fullSql = readFileSync(migrationPath, "utf8");
   const upSql = fullSql.split("-- migrate:down")[0]!.replace("-- migrate:up", "");
 
-  const db = new PGlite();
-  await db.exec(upSql);
+  const db = new PGlite(opts.dataDir);
+  // A persisted DB already has the schema; re-running the migration would fail on CREATE TABLE.
+  const existing = await db.query<{ t: string | null }>("select to_regclass('public.devices')::text as t");
+  if (!existing.rows[0]?.t) await db.exec(upSql);
 
-  const port = await getFreePort();
+  const port = opts.port ?? (await getFreePort());
   const server = new PGLiteSocketServer({ db, port, host: "127.0.0.1" });
   await server.start();
 

@@ -1,6 +1,7 @@
 package app.sakshi.android.data
 
 import android.content.Context
+import retrofit2.HttpException
 import app.sakshi.android.BuildConfig
 import app.sakshi.android.keystore.DeviceKeyManager
 import app.sakshi.android.network.CaptureStatusResponse
@@ -123,11 +124,16 @@ class CaptureRepository(
 
     /** FR-M6: drains locally-signed captures that haven't reached the server yet. Called from
      *  WorkManager (offline-first — captures queue locally and upload once connectivity returns). */
-    suspend fun uploadPending() {
+    suspend fun uploadPending(afterRecovery: Boolean = false) {
         for (capture in dao.getUnsubmitted()) {
+            val deviceId = session.deviceId ?: return
+            // Signed under an earlier registration (see RegistrationRecovery.kt): never uploadable.
+            if (signingDeviceIdOf(capture.manifestBytesBase64) != deviceId) {
+                dao.update(capture.copy(status = CaptureStatus.FAILED, lastError = ORPHANED_CAPTURE_REASON))
+                continue
+            }
             val bodyObj = SubmitCaptureRequest(manifest = capture.manifestBytesBase64, signature = capture.signatureBase64)
             val bodyText = sakshiJson.encodeToString(bodyObj)
-            val deviceId = session.deviceId ?: continue
             val headers = signer.sign(deviceId, "POST", "/v1/captures", bodyText.toByteArray(Charsets.UTF_8))
 
             runCatching {
@@ -144,9 +150,21 @@ class CaptureRepository(
                     ),
                 )
             }.onFailure { err ->
+                if (!afterRecovery && err is HttpException && isUnknownDevice(err.code(), err.response()?.errorBody()?.string())) {
+                    recoverFromForgottenDevice()
+                    return
+                }
                 dao.update(capture.copy(uploadAttempts = capture.uploadAttempts + 1, lastError = err.message))
             }
         }
+    }
+
+    /** The server answered UNKNOWN_DEVICE: everything still queued under this registration is orphaned
+     *  (marked failed above on the next pass), and the app registers afresh so new photos work again. */
+    private suspend fun recoverFromForgottenDevice() {
+        session.clear()
+        ensureRegistered().getOrThrow()
+        uploadPending(afterRecovery = true) // re-runs once (never loops) with the new deviceId: orphans get marked failed, nothing else is queued
     }
 
     /** FR-M7: refreshes status for everything already submitted but not yet finalized. */

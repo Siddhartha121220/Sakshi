@@ -224,6 +224,16 @@ describe("end-to-end: register, submit, anchor, verify", () => {
     expect(actual.headers.get("access-control-allow-origin")).toBe(origin);
   });
 
+  // The Android app keys its self-recovery off this exact response (apps/android/.../RegistrationRecovery.kt):
+  // UNKNOWN_DEVICE makes it re-register, any other 401 must not. Pinned here so the contract can't drift.
+  it("answers a submission from a device it has never seen with 401 UNKNOWN_DEVICE", async () => {
+    const forgotten = { ...(await registerFakeDevice(baseUrl)), deviceId: crypto.randomUUID() };
+
+    await expect(submitFakeCapture(baseUrl, forgotten)).rejects.toThrow(
+      /capture submission failed: 401 .*"code":"UNKNOWN_DEVICE"/,
+    );
+  });
+
   // Device registration with a genuinely bad/missing attestation is covered by
   // test/attestation.test.ts (DEV_SKIP_ATTESTATION, needed for the fake device above to register
   // at all, would make that assertion meaningless against this running app).

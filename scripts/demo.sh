@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# One-command local demo: Anvil chain -> contract deploy -> embedded dev DB -> API + anchor worker ->
-# web verifier -> (optionally) the USB-attached phone. Ctrl+C stops everything it started.
+# One-command local stack: Anvil chain -> contract (deployed once) -> embedded dev DB -> API + anchor
+# worker -> web verifier -> the USB-attached phone. Ctrl+C stops everything it started.
 #
-#   scripts/demo.sh                    full run, including resetting the phone's app
-#   scripts/demo.sh --no-phone         laptop side only (no adb calls at all)
-#   scripts/demo.sh --keep-phone-data  forward the port but don't clear/reinstall the app
+#   scripts/demo.sh             start (or resume) the local stack; updates the app on the phone in place
+#   scripts/demo.sh --reset     wipe the local chain and DB first, for a clean slate
+#   scripts/demo.sh --no-phone  laptop side only (no adb calls at all)
 #
-# Why the phone is reset by default: the dev DB is in-memory, so every run starts with an empty
-# server. A phone still holding the previous run's device registration would get UNKNOWN_DEVICE on
-# its first upload. Resetting the app also wipes its private captures (gallery copies are unaffected).
+# State persists between runs: the chain in .devchain/, the DB in apps/api/.devdb/. So the phone stays
+# registered, and photos anchored yesterday still verify today. After --reset the app notices the
+# server has forgotten it and re-registers by itself (captures signed before that are marked failed;
+# the photos stay in the gallery) — no reinstall needed.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,6 +18,9 @@ APK="$ROOT/apps/android/app/build/outputs/apk/debug/app-debug.apk"
 API_ENV="$ROOT/apps/api/.env"
 WEB_ENV="$ROOT/apps/web/.env.local"
 RPC=http://127.0.0.1:8545
+CHAIN_DIR="$ROOT/.devchain"
+CHAIN_STATE="$CHAIN_DIR/state.json"
+DB_DIR="$ROOT/apps/api/.devdb"
 
 # Anvil's well-known public dev accounts #0 (deployer), #1 (anchorer, matches apps/api/.env), #0 again
 # as revoker. Public test keys, worthless outside a local Anvil.
@@ -24,12 +28,13 @@ export DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae
 export ANCHORER_ADDRESS=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 export REVOKER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
-PHONE=reset
+PHONE=update
+RESET=no
 for arg in "$@"; do
   case "$arg" in
     --no-phone) PHONE=skip ;;
-    --keep-phone-data) PHONE=keep ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    --reset) RESET=yes ;;
+    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -72,25 +77,44 @@ for p in 8545 3000 5173; do
 done
 mkdir -p "$LOGS"
 
+if [ "$RESET" = yes ]; then
+  rm -rf "$CHAIN_DIR" "$DB_DIR"
+  echo "    reset: wiped the local chain and database"
+fi
+# The DB's batches point at roots on the chain. A DB without its chain means every stored proof would
+# fail verification as INVALID, so refuse rather than start in that silently-broken state.
+if [ -d "$DB_DIR" ] && [ ! -f "$CHAIN_STATE" ]; then
+  die "the dev DB exists but the chain state ($CHAIN_STATE) is gone — their data no longer matches. Run with --reset."
+fi
+mkdir -p "$CHAIN_DIR"
+
 step "1/5  Local chain (Anvil)"
 # --block-time: stock Anvil only mines when a transaction arrives, so a lone photo's batch would sit at
 # "confirmed" forever — the worker's local finality rule needs one more block on top of it. A real
 # chain mines continuously; this makes the demo behave like one.
-start anvil "$LOGS/anvil.log" "$ROOT" anvil --block-time 2
+# --state: load the chain from disk and save it back (every second, and on exit), block hashes included,
+# so beacons and anchors from earlier runs still check out.
+start anvil "$LOGS/anvil.log" "$ROOT" anvil --block-time 2 --state "$CHAIN_STATE" --state-interval 1
 rpc_up() { curl -sf -X POST -H 'content-type: application/json' --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' "$RPC"; }
 wait_for "Anvil" 20 rpc_up
 
-step "2/5  Deploy SakshiAnchor"
+step "2/5  SakshiAnchor contract"
+CONTRACT="$(grep -oE '^SAKSHI_ANCHOR_CONTRACT=0x[0-9a-fA-F]{40}' "$API_ENV" | cut -d= -f2 || true)"
+CODE="$( [ -n "$CONTRACT" ] && cast code "$CONTRACT" --rpc-url "$RPC" 2>/dev/null || true)"
+if [ -n "$CODE" ] && [ "$CODE" != "0x" ]; then
+  echo "    already deployed at $CONTRACT ($(cast call "$CONTRACT" 'batchCount()(uint256)' --rpc-url "$RPC") batches so far)"
+else
 DEPLOY_OUT="$(cd "$ROOT/packages/contracts" && forge script script/Deploy.s.sol --rpc-url "$RPC" --broadcast 2>&1)" \
   || { echo "$DEPLOY_OUT" | tail -20; die "contract deployment failed"; }
 CONTRACT="$(echo "$DEPLOY_OUT" | grep "SakshiAnchor deployed at" | grep -oE '0x[0-9a-fA-F]{40}' | head -1)"
 [ -n "$CONTRACT" ] || { echo "$DEPLOY_OUT" | tail -20; die "could not read the deployed address from forge output"; }
 [ "$(cast code "$CONTRACT" --rpc-url "$RPC")" != "0x" ] || die "no contract code at $CONTRACT after deploy"
 echo "    deployed at $CONTRACT"
+fi
 sed -i "s|^SAKSHI_ANCHOR_CONTRACT=.*|SAKSHI_ANCHOR_CONTRACT=$CONTRACT|" "$API_ENV"
 sed -i "s|^VITE_SAKSHI_ANCHOR_CONTRACT=.*|VITE_SAKSHI_ANCHOR_CONTRACT=$CONTRACT|" "$WEB_ENV"
 
-step "3/5  Dev database (embedded, in-memory)"
+step "3/5  Dev database (embedded, persisted in apps/api/.devdb)"
 start db "$LOGS/db.log" "$ROOT/apps/api" ./node_modules/.bin/tsx scripts/dev-db.ts
 db_url_ready() { grep -q '^DATABASE_URL=' "$LOGS/db.log"; }
 wait_for "dev database" 60 db_url_ready
@@ -118,22 +142,18 @@ if [ "$PHONE" != skip ]; then
   else
     adb reverse tcp:3000 tcp:3000 >/dev/null
     echo "    adb reverse tcp:3000 -> laptop:3000 (phone reaches the API over the cable, no shared Wi-Fi needed)"
-    if [ "$PHONE" = reset ]; then
-      # Uninstall rather than `pm clear`: ColorOS/OxygenOS phones reject `pm clear` from adb with a
-      # SecurityException (CLEAR_APP_USER_DATA) unless a Developer Options toggle is on, and the old
-      # script swallowed that error, leaving the stale registration in place -> HTTP 401 on every
-      # upload. `adb uninstall` needs no such permission and also drops the old Keystore key.
-      if adb uninstall app.sakshi >/dev/null 2>&1; then
-        echo "    removed the previous install (wipes its stale registration; gallery copies are untouched)"
+    if [ -f "$APK" ]; then
+      # -r updates in place: the app keeps its registration, key and captures.
+      if adb install -r "$APK" >/dev/null 2>&1; then
+        echo "    updated the app in place (registration and captures kept)"
       else
-        echo "    no previous install to remove"
-      fi
-      if [ -f "$APK" ]; then
+        # Happens only if the installed copy was signed with a different debug key (another machine).
+        echo "    in-place update refused (different signing key) — reinstalling; the app will re-register"
+        adb uninstall app.sakshi >/dev/null 2>&1 || true
         adb install "$APK" >/dev/null || die "could not install $APK"
-        echo "    installed $(basename "$APK")"
-      else
-        echo "    no APK at $APK — build it: (cd apps/android && ./gradlew :app:assembleDebug)"
       fi
+    else
+      echo "    no APK at $APK — build it: (cd apps/android && ./gradlew :app:assembleDebug)"
     fi
   fi
 fi

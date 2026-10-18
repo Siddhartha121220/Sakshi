@@ -25,9 +25,9 @@ packages/core       Shared TS: protocol, pHash, merkle, verify(); test-vectors/ 
 pnpm install                         # all TS workspaces
 pnpm -r test                         # all TS tests — apps/api spins up its own Anvil + embedded DB per file, no setup needed
 pnpm -r typecheck
-scripts/demo.sh                      # whole local demo in one go: chain, deploy, DB, API+worker, web, phone (see header for flags)
+scripts/demo.sh                      # whole local stack in one go; state persists between runs (--reset wipes it)
 pnpm --filter api db:migrate         # dbmate up — real deployments only; tests don't need this
-pnpm --filter api dev:db             # embedded dev Postgres; prints the DATABASE_URL for .env
+pnpm --filter api dev:db             # embedded dev Postgres, persisted in apps/api/.devdb on port 54329
 pnpm --filter api dev:all            # API + anchor worker in ONE process (see below)
 pnpm --filter web dev                # verifier (needs apps/web/.env.local — see .env.example)
 cd packages/contracts && forge test -vvv && forge coverage

@@ -17,6 +17,8 @@ class DeviceSession(context: Context) {
 
     val isRegistered: Boolean get() = deviceId != null
 
+    fun clear() = prefs.edit().clear().apply()
+
     companion object {
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_SECURITY_LEVEL = "security_level"

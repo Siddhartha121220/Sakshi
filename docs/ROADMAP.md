@@ -73,6 +73,9 @@ Legend: ☐ todo · ◐ in progress · ☑ done
   zip itself not yet confirmed); a generic-MIME "send as file" was tried first and observed NOT to work
 - ☑ Gallery copy of every new capture (`Pictures/Sakshi`, export only — invariant #5 holds); capture date
   and time shown on each capture
+- ☑ Local state persists: Anvil `--state` (block hashes included, so old beacons still verify) and an
+  on-disk dev DB; a capture anchored in one run verified AUTHENTIC after a full restart. The app
+  re-registers itself on `UNKNOWN_DEVICE` instead of needing a reinstall
 - ☑ `scripts/demo.sh` — one command for the whole local demo (chain, deploy, DB, API + worker, web, phone
   over USB via `adb reverse`, so phone and laptop needn't share a network)
 - ☑ Opt-in location — written, not yet run

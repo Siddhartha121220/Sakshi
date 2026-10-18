@@ -36,6 +36,15 @@ Registers a device after verifying Android Key Attestation (PROTOCOL §2.3).
 ```
 Errors: `400 INVALID_CHALLENGE`, `422 ATTESTATION_FAILED` (with `reason`: `UNTRUSTED_ROOT`, `REVOKED_CERT`, `SOFTWARE_KEY`, `UNLOCKED_BOOTLOADER`, `WRONG_APP`, `KEY_MISMATCH`), `409 DEVICE_EXISTS`.
 
+### `GET /v1/devices/me` — Device
+Lets the app confirm, before signing new photos, that the server still has its registration (e.g. after
+a server data reset). Signed like any device request (PROTOCOL §9, empty body).
+`200`:
+```json
+{ "deviceId": "uuid", "securityLevel": "tee", "revoked": false }
+```
+Errors: `401 UNKNOWN_DEVICE` (the app then re-registers), `401 BAD_SIGNATURE`, `401 STALE_TIMESTAMP`.
+
 ---
 
 ## Time beacon

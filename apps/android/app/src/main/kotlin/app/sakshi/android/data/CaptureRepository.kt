@@ -77,7 +77,7 @@ class CaptureRepository(
 
     /** FR-M1: generate the key (with attestation) and register, if this install hasn't already. */
     suspend fun ensureRegistered(): Result<Unit> = runCatching {
-        if (session.isRegistered) return@runCatching
+        if (session.isRegistered && serverStillKnowsUs()) return@runCatching
 
         val challengeResponse = sakshiJson.decodeFromString<ChallengeResponse>(api.requestChallenge())
         val challengeBytes = android.util.Base64.decode(challengeResponse.challenge, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
@@ -178,6 +178,28 @@ class CaptureRepository(
                 }
                 dao.update(capture.copy(uploadAttempts = capture.uploadAttempts + 1, lastError = err.message))
             }
+        }
+    }
+
+    /** Checked at startup, before any photo is signed with this registration: if the server has
+     *  forgotten the device (its data was reset), the session is dropped so ensureRegistered registers
+     *  afresh, instead of the next photo being signed under a dead registration and orphaned. Offline
+     *  or any other error -> assume still registered (offline-first; uploads recover later if not). */
+    private suspend fun serverStillKnowsUs(): Boolean {
+        val deviceId = session.deviceId ?: return false
+        val headers = signer.sign(deviceId, "GET", "/v1/devices/me", ByteArray(0))
+        return try {
+            api.getMe(headers.deviceId, headers.timestamp, headers.signatureBase64)
+            true
+        } catch (e: HttpException) {
+            if (isUnknownDevice(e.code(), e.response()?.errorBody()?.string())) {
+                session.clear()
+                false
+            } else {
+                true
+            }
+        } catch (e: java.io.IOException) {
+            true
         }
     }
 

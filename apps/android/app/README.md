@@ -60,7 +60,7 @@ calls into, and the rest was verified by hand on a real phone (see **What's veri
 | `ui/` | Compose: `CaptureScreen` (camera), `CaptureListScreen` (status + share), `CaptureViewModel` |
 
 ## What's verified, and what isn't
-**Verified on a real phone (OnePlus CPH2381, 2026-10-03):**
+**Verified on a real phone (OnePlus CPH2381, 2026-10-03, and again 2026-10-18 with attestation enforced):**
 - `DeviceKeyManager` generates a genuine hardware-backed P-256 key and a real 4-certificate Key
   Attestation chain that chains to Google's Hardware Attestation Root. StrongBox was unavailable,
   so it fell back to TEE exactly as designed. The captured chain is fixtured at
@@ -78,10 +78,6 @@ calls into, and the rest was verified by hand on a real phone (see **What's veri
   docs/ROADMAP.md Phase 0 asks for 3+.
 - **StrongBox.** This device didn't have it, so that branch and the `strongbox` security level
   have never executed.
-- **Registration with attestation actually enforced.** The run used `DEV_SKIP_ATTESTATION=true`, so
-  the server accepted the device without checking its chain. The chain is real and now verifies
-  offline in `apps/api/test/real-attestation.test.ts`, but the live path hasn't rejected or
-  accepted a real device on its own merits yet.
 - **The share sheet** — both "Send photo" and "Share proof" are written and compile, but neither has been tapped on a device.
 - Opt-in location, and the Compose UI beyond the capture and list screens.
 

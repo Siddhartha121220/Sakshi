@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { fromBase64, sha256 } from "@sakshi/core";
-import type { AppContext } from "../app.js";
+import { requireDeviceSignature, type AppContext } from "../app.js";
 import { createChallenge } from "../lib/challenge.js";
 import { verifyAndroidAttestation } from "../attestation.js";
 import type { DeviceRow } from "../types.js";
@@ -15,6 +15,18 @@ const RegisterBodySchema = z.object({
 });
 
 export function registerDeviceRoutes(app: FastifyInstance, ctx: AppContext) {
+  // Lets a device confirm the server still knows it BEFORE signing photos with that registration
+  // (the app checks at startup). Signed like any device request, so it also proves key possession;
+  // a forgotten device gets the same 401 UNKNOWN_DEVICE that requireDeviceSignature sends uploads.
+  app.get("/v1/devices/me", { preHandler: requireDeviceSignature(ctx) }, async (request) => {
+    const device = request.device!;
+    return {
+      deviceId: device.id,
+      securityLevel: device.securityLevel,
+      revoked: device.compromisedAt !== null,
+    };
+  });
+
   app.post("/v1/devices/challenge", async () => {
     const { challenge, expiresAt } = createChallenge(ctx.config.SERVER_CHALLENGE_SECRET);
     return { challenge, expiresAt: expiresAt.toISOString() };

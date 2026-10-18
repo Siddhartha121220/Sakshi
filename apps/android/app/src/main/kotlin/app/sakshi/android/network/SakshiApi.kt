@@ -18,6 +18,14 @@ interface SakshiApi {
     @POST("/v1/devices")
     suspend fun registerDevice(@Body body: String): String
 
+    /** Device-signed (empty body): does the server still know this registration? */
+    @GET("/v1/devices/me")
+    suspend fun getMe(
+        @Header("X-Sakshi-Device") deviceId: String,
+        @Header("X-Sakshi-Timestamp") timestamp: String,
+        @Header("X-Sakshi-Signature") signature: String,
+    ): String
+
     @GET("/v1/time-beacon")
     suspend fun getTimeBeacon(): String
 

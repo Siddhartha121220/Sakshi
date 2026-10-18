@@ -113,6 +113,14 @@ step "1/5  Local chain (Anvil)"
 start anvil "$LOGS/anvil.log" "$ROOT" anvil --block-time 2 --slots-in-an-epoch 1 --state "$CHAIN_STATE" --state-interval 1
 rpc_up() { curl -sf -X POST -H 'content-type: application/json' --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' "$RPC"; }
 wait_for "Anvil" 20 rpc_up
+# A reloaded chain resumes from its last saved block timestamp, so every restart would leave the chain
+# clock behind real time by however long it was stopped — and the verifier's "proven taken between"
+# window would be wrong by that much. Jump the next block to now (time only ever moves forward).
+HEAD_TS="$(cast block latest --field timestamp --rpc-url "$RPC")"
+if [ "$HEAD_TS" -lt "$(date +%s)" ]; then
+  cast rpc evm_setNextBlockTimestamp "$(date +%s)" --rpc-url "$RPC" >/dev/null
+  echo "    chain clock caught up with real time (it was $(( $(date +%s) - HEAD_TS ))s behind after reloading)"
+fi
 
 step "2/5  SakshiAnchor contract"
 CONTRACT="$(grep -oE '^SAKSHI_ANCHOR_CONTRACT=0x[0-9a-fA-F]{40}' "$API_ENV" | cut -d= -f2 || true)"

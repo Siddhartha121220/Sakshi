@@ -17,7 +17,7 @@ Legend: ☐ todo · ◐ in progress · ☑ done
   - ☑ **It immediately earned its keep.** `attestation.ts` read `attestationApplicationId` from the hardware-enforced list; real Keystore puts it in the *software*-enforced one (the TEE doesn't know what a package name is). Every genuine device would have been rejected with `WRONG_APP`. All 17 synthetic-chain tests passed against that bug, because the synthetic builder shared the wrong assumption — only real hardware could expose it.
   - ☐ **2+ more phones, different OEMs.** One device cannot tell us which of its quirks are universal.
   - ☐ **StrongBox never exercised** — this phone fell back to TEE, so `DeviceKeyManager`'s StrongBox path and the `strongbox` security level remain unrun.
-  - ☐ **The live registration path still hasn't enforced attestation.** The device run had `DEV_SKIP_ATTESTATION=true`, so the server accepted the device without checking. The chain it stored is real and now verifies offline, but no phone has yet registered through `POST /v1/devices` with attestation actually enforced. Flipping that flag off and re-registering is a short task and the obvious next step.
+  - ☑ **Live registration with attestation enforced (2026-10-18).** With `DEV_SKIP_ATTESTATION=false` and the debug signing digest allowed, the OnePlus registered through `POST /v1/devices` (201, real 4-cert chain, Google's live revocation list fetched), then a photo went capture → anchor → finalized and verified AUTHENTIC in the browser. No check skipped anywhere.
 - **Exit:** ~~CI green on an empty repo~~; partly met — real chains captured and fixtured (1 device, not 3+), and `apps/api/src/attestation.ts` is no longer synthetic-only.
 
 ## Phase 1 — Smart contract (week 1–2) ☑ done
@@ -40,7 +40,7 @@ Legend: ☐ todo · ◐ in progress · ☑ done
 ## Phase 3 — API, database, and anchor worker (week 3–4) ☑ done
 - ☑ Fastify app, config via env (zod-validated), structured logging (pino)
 - ☑ dbmate wired as the documented migration tool (`pnpm db:migrate`); tests apply the same SQL directly against an embedded DB instead (dbmate doesn't get along with that bridge — see `apps/api/README.md`)
-- ☑ Device registration + attestation verification — real Key Attestation parsing/validation (`src/attestation.ts`), tested against synthetic certs **and, since 2026-10-03, against a real captured device chain** (`test/real-attestation.test.ts`), which is what caught the hardware-vs-software-enforced `attestationApplicationId` bug. Enforcement on the live registration path is still unexercised — see Phase 0
+- ☑ Device registration + attestation verification — real Key Attestation parsing/validation (`src/attestation.ts`), tested against synthetic certs **and, since 2026-10-03, against a real captured device chain** (`test/real-attestation.test.ts`), which is what caught the hardware-vs-software-enforced `attestationApplicationId` bug. Enforced live on a real phone on 2026-10-18 — see Phase 0
 - ☑ Device request-signature middleware (`src/lib/device-auth.ts`, PROTOCOL §9)
 - ☑ Captures: submit, get, by-hash, status, search-similar
 - ☑ Time-beacon endpoint
@@ -90,6 +90,11 @@ Legend: ☐ todo · ◐ in progress · ☑ done
   Link format pinned by matching tests in Kotlin and TypeScript
 - ☑ Fixed: on a persisted chain Anvil's "finalized" trails the head by 64 blocks, so photos took 2+
   minutes to finalize; one-slot epochs bring it to ~2 blocks (44 s end to end, measured)
+- ☑ App checks its registration at startup (`GET /v1/devices/me`, device-signed) so a server reset is
+  caught before a photo is signed under a dead registration — confirmed on the phone: 401 → re-register
+- ☑ Fixed: a reloaded Anvil resumes from its last saved block timestamp, leaving the chain clock behind
+  real time by the downtime (20 min observed), so the proven time window was wrong. `demo.sh` now
+  jumps the next block to now on start
 - ☑ `scripts/demo.sh` — one command for the whole local demo (chain, deploy, DB, API + worker, web, phone
   over USB via `adb reverse`, so phone and laptop needn't share a network)
 - ☑ Opt-in location — written, not yet run

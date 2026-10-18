@@ -234,6 +234,26 @@ describe("end-to-end: register, submit, anchor, verify", () => {
     );
   });
 
+  it("GET /v1/devices/me confirms a registered device, and rejects a forgotten one with UNKNOWN_DEVICE", async () => {
+    const device = await registerFakeDevice(baseUrl);
+    const signedGet = async (deviceId: string) => {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const canonical = `GET\n/v1/devices/me\n${timestamp}\n${toHex(await sha256(new Uint8Array(0)))}`;
+      const sig = await signP256AsDer(device.privateKey, new TextEncoder().encode(canonical));
+      return fetch(`${baseUrl}/v1/devices/me`, {
+        headers: { "x-sakshi-device": deviceId, "x-sakshi-timestamp": String(timestamp), "x-sakshi-signature": toBase64(sig) },
+      });
+    };
+
+    const known = await signedGet(device.deviceId);
+    expect(known.status).toBe(200);
+    expect(await known.json()).toEqual({ deviceId: device.deviceId, securityLevel: "tee", revoked: false });
+
+    const forgotten = await signedGet(crypto.randomUUID());
+    expect(forgotten.status).toBe(401);
+    expect(((await forgotten.json()) as { error: { code: string } }).error.code).toBe("UNKNOWN_DEVICE");
+  });
+
   // Device registration with a genuinely bad/missing attestation is covered by
   // test/attestation.test.ts (DEV_SKIP_ATTESTATION, needed for the fake device above to register
   // at all, would make that assertion meaningless against this running app).

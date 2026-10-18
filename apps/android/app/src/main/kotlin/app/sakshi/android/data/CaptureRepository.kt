@@ -53,6 +53,21 @@ class CaptureRepository(
         Beacon(chainId = response.chainId, blockNumber = response.blockNumber, blockHash = response.blockHash)
     }.getOrNull()
 
+    /** Settings' "Test connection": reaches the server and reports which chain it anchors to. */
+    suspend fun checkServer(): Result<String> = runCatching {
+        val beacon = sakshiJson.decodeFromString<TimeBeaconResponse>(api.getTimeBeacon())
+        "Connected — chain ${beacon.chainId}, block ${beacon.blockNumber}"
+    }
+
+    /** A different server keeps its own device registry, so switching servers means registering
+     *  afresh there. Called after the server address changes. */
+    suspend fun reRegister(): Result<Unit> {
+        session.clear()
+        return ensureRegistered()
+    }
+
+    suspend fun unsubmittedCount(): Int = dao.getUnsubmitted().size
+
     /** FR-M1: generate the key (with attestation) and register, if this install hasn't already. */
     suspend fun ensureRegistered(): Result<Unit> = runCatching {
         if (session.isRegistered) return@runCatching

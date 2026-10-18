@@ -16,8 +16,10 @@ val sakshiJson: Json = Json {
     explicitNulls = false
 }
 
-fun createSakshiApi(baseUrl: String, debug: Boolean): SakshiApi {
+/** [currentBaseUrl] is read on every request (see BaseUrlInterceptor), so the server can be changed at runtime. */
+fun createSakshiApi(currentBaseUrl: () -> String, debug: Boolean): SakshiApi {
     val client = OkHttpClient.Builder()
+        .addInterceptor(BaseUrlInterceptor(currentBaseUrl))
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .apply {
@@ -26,7 +28,7 @@ fun createSakshiApi(baseUrl: String, debug: Boolean): SakshiApi {
         .build()
 
     val retrofit = Retrofit.Builder()
-        .baseUrl(baseUrl)
+        .baseUrl(currentBaseUrl())
         .client(client)
         .addConverterFactory(ScalarsConverterFactory.create())
         .build()

@@ -5,6 +5,14 @@
 #   scripts/demo.sh             start (or resume) the local stack; updates the app on the phone in place
 #   scripts/demo.sh --reset     wipe the local chain and DB first, for a clean slate
 #   scripts/demo.sh --no-phone  laptop side only (no adb calls at all)
+#   scripts/demo.sh --phone SERIAL   which phone, when more than one is connected (`adb devices` lists them)
+#
+# Phone connection, any of:
+#   USB cable               plug in with USB debugging on; nothing else to do
+#   Wi-Fi via adb           pair once: phone Settings > Developer options > Wireless debugging > Pair with
+#                           code, then `adb pair IP:PAIRPORT` and `adb connect IP:PORT`. adb reverse works
+#                           over that link exactly as over USB. Phone and laptop must share a network.
+#   Wi-Fi without adb       in the app: Settings > Server > http://<laptop Wi-Fi IP>:3000 (printed at the end)
 #
 # State persists between runs: the chain in .devchain/, the DB in apps/api/.devdb/. So the phone stays
 # registered, and photos anchored yesterday still verify today. After --reset the app notices the
@@ -30,14 +38,18 @@ export REVOKER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
 PHONE=update
 RESET=no
+PHONE_NEXT=no
 for arg in "$@"; do
+  if [ "$PHONE_NEXT" = yes ]; then export ANDROID_SERIAL="$arg"; PHONE_NEXT=no; continue; fi
   case "$arg" in
     --no-phone) PHONE=skip ;;
     --reset) RESET=yes ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    --phone) PHONE_NEXT=yes ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
+[ "$PHONE_NEXT" = yes ] && { echo "--phone needs a serial (see adb devices)" >&2; exit 2; }
 
 PIDS=()
 cleanup() {
@@ -136,12 +148,15 @@ if [ "$PHONE" != skip ]; then
   step "Phone"
   if ! command -v adb >/dev/null; then
     echo "    adb not found — skipping the phone (laptop side is up)"
+  elif [ -z "${ANDROID_SERIAL:-}" ] && [ "$(adb devices | awk 'NR>1 && $2=="device"' | wc -l)" -gt 1 ]; then
+    echo "    more than one phone/connection attached (e.g. USB and Wi-Fi) — pick one with --phone:"
+    adb devices | awk 'NR>1 && $2=="device" {print "      " $1}'
   elif ! adb get-state >/dev/null 2>&1; then
-    echo "    no phone attached over USB (or USB debugging is off) — skipping. Plug it in and re-run,"
-    echo "    or do it by hand:  adb reverse tcp:3000 tcp:3000"
+    echo "    no phone reachable over adb (USB debugging off, or not paired over Wi-Fi) — skipping."
+    echo "    Connect it and re-run, or use Wi-Fi without adb (see the address below)."
   else
     adb reverse tcp:3000 tcp:3000 >/dev/null
-    echo "    adb reverse tcp:3000 -> laptop:3000 (phone reaches the API over the cable, no shared Wi-Fi needed)"
+    echo "    adb reverse tcp:3000 -> laptop:3000 on $(adb get-serialno) (the app's 127.0.0.1:3000 now reaches this laptop)"
     if [ -f "$APK" ]; then
       # -r updates in place: the app keeps its registration, key and captures.
       if adb install -r "$APK" >/dev/null 2>&1; then
@@ -158,6 +173,7 @@ if [ "$PHONE" != skip ]; then
   fi
 fi
 
+LAN_IPS="$(ip -4 -o addr show scope global 2>/dev/null | awk '$2 !~ /^(docker|br-|veth|virbr)/ {sub(/\/.*/, "", $4); print $4}' | paste -sd' ')"
 cat <<EOF
 
 ────────────────────────────────────────────────────────────
@@ -167,6 +183,7 @@ cat <<EOF
   API        http://localhost:3000
   Chain      $RPC   (contract $CONTRACT)
   Logs       $LOGS/{anvil,db,api,web}.log
+  Wi-Fi      phone without adb: app Settings > Server > http://<one of: ${LAN_IPS:-no LAN address found}>:3000
 
   1. Open the app on the phone, wait for registration, take a photo.
   2. Watch it go Signed -> Uploaded -> Anchored -> Finalized (~15s per step).

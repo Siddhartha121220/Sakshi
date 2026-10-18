@@ -76,6 +76,10 @@ Legend: ☐ todo · ◐ in progress · ☑ done
 - ☑ Local state persists: Anvil `--state` (block hashes included, so old beacons still verify) and an
   on-disk dev DB; a capture anchored in one run verified AUTHENTIC after a full restart. The app
   re-registers itself on `UNKNOWN_DEVICE` instead of needing a reinstall
+- ☑ Server address set in the app (Settings tab, runtime, no rebuild; strict parsing, connection test),
+  a proper bottom navigation bar, and a retry action when registration fails. Wireless adb documented
+  in `demo.sh` (`--phone SERIAL`), not yet tried on a device; the API answering on the laptop's Wi-Fi
+  address was checked
 - ☑ `scripts/demo.sh` — one command for the whole local demo (chain, deploy, DB, API + worker, web, phone
   over USB via `adb reverse`, so phone and laptop needn't share a network)
 - ☑ Opt-in location — written, not yet run

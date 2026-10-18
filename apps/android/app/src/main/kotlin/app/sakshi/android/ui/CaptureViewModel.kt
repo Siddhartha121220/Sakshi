@@ -9,6 +9,7 @@ import app.sakshi.android.camera.ImageDecode
 import app.sakshi.android.data.CaptureEntity
 import app.sakshi.android.data.createShareZip
 import app.sakshi.android.data.saveToGallery
+import app.sakshi.android.network.normalizeServerUrl
 import app.sakshi.android.work.UploadWorker
 import app.sakshi.protocol.Location
 import app.sakshi.protocol.PHash
@@ -32,6 +33,11 @@ sealed interface RegistrationState {
 
 class CaptureViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as SakshiApplication).repository
+    private val serverSettings = (application as SakshiApplication).serverSettings
+
+    private val _serverUrl = MutableStateFlow(serverSettings.baseUrl)
+    val serverUrl: StateFlow<String> = _serverUrl
+    val defaultServerUrl: String get() = serverSettings.defaultBaseUrl
 
     private val _registration = MutableStateFlow<RegistrationState>(RegistrationState.Checking)
     val registration: StateFlow<RegistrationState> = _registration
@@ -43,14 +49,50 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         repository.observeCaptures().stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
 
     init {
-        viewModelScope.launch {
-            repository.ensureRegistered()
-                .onSuccess { _registration.value = RegistrationState.Registered }
-                .onFailure { _registration.value = RegistrationState.Failed(it.message ?: "registration failed") }
-        }
+        register { repository.ensureRegistered() }
         // Refresh pending captures' statuses on open, not just right after a new capture — the
         // 15-minute periodic WorkManager schedule is too slow for "I just reopened the app".
         UploadWorker.runNow(application)
+    }
+
+    private fun register(attempt: suspend () -> Result<Unit>) {
+        _registration.value = RegistrationState.Checking
+        viewModelScope.launch {
+            attempt()
+                .onSuccess { _registration.value = RegistrationState.Registered }
+                .onFailure { _registration.value = RegistrationState.Failed(it.message ?: "registration failed") }
+        }
+    }
+
+    fun retryRegistration() = register { repository.ensureRegistered() }
+
+    /** Validates and saves a new server address, then registers this phone there. Returns an error
+     *  message for the field, or null on success. */
+    fun saveServerUrl(input: String): String? {
+        val url = normalizeServerUrl(input)
+            ?: return "Not a valid server address. Use host:port (e.g. 192.168.1.5:3000) or a full https:// URL."
+        if (url == serverSettings.baseUrl) return null
+        serverSettings.baseUrl = url
+        _serverUrl.value = url
+        register { repository.reRegister() }
+        return null
+    }
+
+    fun resetServerUrl() {
+        val before = serverSettings.baseUrl
+        serverSettings.resetToDefault()
+        _serverUrl.value = serverSettings.baseUrl
+        if (before != serverSettings.baseUrl) register { repository.reRegister() }
+    }
+
+    fun testConnection(onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            onResult(repository.checkServer().getOrElse { "Can't reach the server: ${it.message ?: it.javaClass.simpleName}" })
+        }
+    }
+
+    fun unsubmittedCount(onResult: (Int) -> Unit) {
+        viewModelScope.launch { onResult(repository.unsubmittedCount()) }
     }
 
     /** FR-M4: capture -> hash -> sign, target < 500ms (excluding the optional network beacon

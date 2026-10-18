@@ -6,6 +6,21 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import app.sakshi.android.ui.SettingsScreen
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -29,7 +44,7 @@ import app.sakshi.android.ui.CaptureViewModel
 import app.sakshi.android.ui.RegistrationState
 import app.sakshi.android.ui.theme.SakshiTheme
 
-private enum class Screen { CAPTURE, LIST }
+private enum class Screen { CAPTURE, LIST, SETTINGS }
 
 class MainActivity : ComponentActivity() {
     private val viewModel: CaptureViewModel by viewModels()
@@ -51,43 +66,78 @@ class MainActivity : ComponentActivity() {
                     val registration by viewModel.registration.collectAsState()
                     val processing by viewModel.processing.collectAsState()
                     val captures by viewModel.captures.collectAsState()
+                    val serverUrl by viewModel.serverUrl.collectAsState()
 
                     Scaffold(
                         bottomBar = {
-                            Column {
-                                Button(onClick = { screen = Screen.CAPTURE }) { Text("Capture") }
-                                Button(onClick = { screen = Screen.LIST }) { Text("My captures (${captures.size})") }
+                            NavigationBar {
+                                NavigationBarItem(
+                                    selected = screen == Screen.CAPTURE,
+                                    onClick = { screen = Screen.CAPTURE },
+                                    icon = { Icon(Icons.Filled.AddCircle, contentDescription = null) },
+                                    label = { Text("Capture") },
+                                )
+                                NavigationBarItem(
+                                    selected = screen == Screen.LIST,
+                                    onClick = { screen = Screen.LIST },
+                                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
+                                    label = { Text("My captures (${captures.size})") },
+                                )
+                                NavigationBarItem(
+                                    selected = screen == Screen.SETTINGS,
+                                    onClick = { screen = Screen.SETTINGS },
+                                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                                    label = { Text("Settings") },
+                                )
                             }
                         },
                     ) { padding ->
-                        Column(Modifier.fillMaxSize()) {
-                            when (val state = registration) {
-                                RegistrationState.Checking -> Text("Registering this device…", Modifier.fillMaxSize())
-                                is RegistrationState.Failed -> Text("Registration failed: ${state.message}", Modifier.fillMaxSize())
-                                RegistrationState.Registered -> when (screen) {
-                                    Screen.CAPTURE -> CaptureScreen(
-                                        processing = processing,
-                                        locationOptedIn = locationOptedIn,
-                                        onLocationOptInChanged = { locationOptedIn = it },
-                                        onPhotoCaptured = { file -> viewModel.onPhotoCaptured(file, locationOptedIn) },
+                        Column(Modifier.fillMaxSize().padding(padding)) {
+                            if (screen == Screen.SETTINGS) {
+                                // Reachable even when registration failed — that's when a wrong server address needs fixing.
+                                SettingsScreen(
+                                    serverUrl = serverUrl,
+                                    defaultServerUrl = viewModel.defaultServerUrl,
+                                    registration = registration,
+                                    onSave = viewModel::saveServerUrl,
+                                    onReset = viewModel::resetServerUrl,
+                                    onTestConnection = viewModel::testConnection,
+                                    onRetryRegistration = viewModel::retryRegistration,
+                                    countUnsubmitted = viewModel::unsubmittedCount,
+                                )
+                            } else {
+                                when (val state = registration) {
+                                    RegistrationState.Checking -> CenteredMessage("Registering this phone with the server…")
+                                    is RegistrationState.Failed -> CenteredMessage(
+                                        "Couldn't register with the server: ${state.message}",
+                                        action = "Retry" to viewModel::retryRegistration,
+                                        secondary = "Server settings" to { screen = Screen.SETTINGS },
                                     )
-                                    Screen.LIST -> CaptureListScreen(
-                                        captures = captures,
-                                        onSendPhoto = { capture, asFile -> sendPhoto(java.io.File(capture.photoFilePath), asFile) },
-                                        onShare = { capture ->
-                                            viewModel.exportAndShare(
-                                                capture.localId,
-                                                onReady = { file -> shareFile(file) },
-                                                onError = { reason ->
-                                                    Toast.makeText(
-                                                        this@MainActivity,
-                                                        "Couldn't fetch the proof from the server ($reason). Is it reachable?",
-                                                        Toast.LENGTH_LONG,
-                                                    ).show()
-                                                },
-                                            )
-                                        },
-                                    )
+                                    RegistrationState.Registered -> when (screen) {
+                                        Screen.CAPTURE -> CaptureScreen(
+                                            processing = processing,
+                                            locationOptedIn = locationOptedIn,
+                                            onLocationOptInChanged = { locationOptedIn = it },
+                                            onPhotoCaptured = { file -> viewModel.onPhotoCaptured(file, locationOptedIn) },
+                                        )
+                                        else -> CaptureListScreen(
+                                            captures = captures,
+                                            onSendPhoto = { capture, asFile -> sendPhoto(java.io.File(capture.photoFilePath), asFile) },
+                                            onShare = { capture ->
+                                                viewModel.exportAndShare(
+                                                    capture.localId,
+                                                    onReady = { file -> shareFile(file) },
+                                                    onError = { reason ->
+                                                        Toast.makeText(
+                                                            this@MainActivity,
+                                                            "Couldn't fetch the proof from the server ($reason). Is it reachable?",
+                                                            Toast.LENGTH_LONG,
+                                                        ).show()
+                                                    },
+                                                )
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -134,5 +184,19 @@ class MainActivity : ComponentActivity() {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(intent, "Share proof bundle"))
+    }
+}
+
+/** A message centred in the content area, with up to two actions (e.g. "Retry" and "Server settings"). */
+@Composable
+private fun CenteredMessage(text: String, action: Pair<String, () -> Unit>? = null, secondary: Pair<String, () -> Unit>? = null) {
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(text, textAlign = TextAlign.Center)
+        action?.let { (label, onClick) -> Button(onClick = onClick, modifier = Modifier.padding(top = 16.dp)) { Text(label) } }
+        secondary?.let { (label, onClick) -> TextButton(onClick = onClick) { Text(label) } }
     }
 }

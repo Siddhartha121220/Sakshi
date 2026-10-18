@@ -20,8 +20,21 @@ failed with a clear reason — they can't be accepted under a new key). With the
 set to `http://127.0.0.1:3000` (below) the phone reaches the laptop **over the USB cable**, so the two
 don't need to share a network and the laptop's IP can change freely.
 
-### Pointing the debug build at your API
-The debug build's API base URL comes from `apps/android/local.properties` (gitignored, so each
+### Choosing the server at runtime (Settings tab)
+**Settings > Server** changes where the app sends records without a rebuild: `host:port` for a laptop on
+the same Wi-Fi (`demo.sh` prints the laptop's address), `127.0.0.1:3000` over USB or Wi-Fi adb with
+`adb reverse`, or a hosted `https://` URL. "Test connection" fetches a time beacon to prove it's
+reachable. A different server keeps its own device registry, so switching re-registers the phone
+(with a confirmation that says how many not-yet-uploaded photos that orphans). The address is parsed
+strictly (`network/ServerUrl.kt`): a path or query is rejected rather than silently dropped. Applied
+per request by an OkHttp interceptor, so no client rebuild is needed.
+
+**Wireless adb** (`adb pair` / `adb connect`, see `scripts/demo.sh --help`) is written into the script
+but **not yet tried on a phone**: it relies on adb's documented behaviour that `adb reverse` works over a
+wireless connection exactly as over USB.
+
+### Build-time default server
+The debug build's default API base URL (what Settings > Server starts from) comes from `apps/android/local.properties` (gitignored, so each
 developer's own address stays out of the repo):
 ```properties
 sakshi.apiBaseUrl=http://127.0.0.1:3000      # via `adb reverse` over USB; or your laptop's LAN IP over Wi-Fi

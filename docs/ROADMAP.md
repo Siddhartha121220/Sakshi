@@ -24,9 +24,9 @@ Legend: ☐ todo · ◐ in progress · ☑ done
 - ☑ `SakshiAnchor.sol`: `anchor`, `revokeDevice`, `verify`, `batchCount`, roles
 - ☑ Foundry unit tests, fuzz tests (`verify` with random trees), invariant tests (append-only batches, revocation only earlier)
 - ☑ Slither: 0 high/medium findings (1 documented false positive)
-- ☑ Deploy script (local/testnet) — not yet actually deployed to Base Sepolia
+- ☑ Deploy script, and **deployed to Base Sepolia** on 2026-10-18: `0xf412dE9954A9d8caa35a0B6c1c6E193703765B51` (see packages/contracts/README.md)
 - ☐ Gas report: anchor cost vs. leaf count (for the README table)
-- **Exit:** 100% line/statement/branch/function coverage on `SakshiAnchor.sol`. Not yet live on Base Sepolia.
+- **Exit:** met — 100% line/statement/branch/function coverage on `SakshiAnchor.sol`, and live on Base Sepolia.
 
 ## Phase 2 — Core protocol library `packages/core` (week 2–3) ☑ done
 - ☑ Manifest types + zod schema; JCS canonicalisation

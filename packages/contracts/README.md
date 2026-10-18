@@ -46,3 +46,14 @@ forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --verify
 On testnet the deployer address keeps `DEFAULT_ADMIN_ROLE`. Before any production deployment,
 transfer admin to a multisig — see `docs/THREAT_MODEL.md` T15. This is a deliberate manual step,
 not automated by the script.
+
+## Live deployments
+| Network | Chain ID | SakshiAnchor | Deployed |
+|---|---|---|---|
+| Base Sepolia (testnet) | 84532 | `0xf412dE9954A9d8caa35a0B6c1c6E193703765B51` | 2026-10-18, tx `0x5a4b5aea87fad3ac89b6b444c78dbb3007552a4fa2c2634d65dbfcd5d220a4a6` |
+
+Testnet roles: one generated testnet wallet (`0x17021A2E6b47676300143E59ca54112230f0067d`) holds admin, anchorer
+and revoker; its key lives only in the gitignored `.env.sepolia`. Production must split these roles and
+put admin behind a multisig (docs/THREAT_MODEL.md T14/T15). Deploy cost was ~0.0000056 ETH; an anchor is
+~0.0000005 ETH at 0.006 gwei. Source not yet verified on Basescan (needs a `BASESCAN_API_KEY`).
+Transaction record: `broadcast/Deploy.s.sol/84532/`.

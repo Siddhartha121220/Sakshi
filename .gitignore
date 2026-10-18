@@ -37,3 +37,7 @@ apps/android/.idea/
 # persisted embedded dev DB (apps/api/scripts/dev-db.ts) and local chain state (scripts/demo.sh)
 apps/api/.devdb/
 .devchain/
+
+# forge scratch files (the run-*.json deployment records themselves are committed)
+packages/contracts/broadcast/**/dry-run/
+packages/contracts/broadcast/**/*.recovery.lock

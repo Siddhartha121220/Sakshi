@@ -90,7 +90,8 @@ calls into, and the rest was verified by hand on a real phone (see **What's veri
 |---|---|---|
 | **Send photo** | the signed JPEG as an ordinary image (WhatsApp recompresses it → verifier says `SIMILAR_TO_AUTHENTIC`) | no |
 | **Send as zip** | the same JPEG inside a `.zip`, byte-for-byte (recipient unzips → verifier can say `AUTHENTIC`) | no |
-| **Share proof** | the small `.sakshi.json` proof file: signed manifest, signature, the device's key + attestation chain, Merkle proof and anchor. For checking a photo **without trusting or reaching our API** — the verifier's "Upload a proof bundle file" link, then drop the photo | **yes** — it downloads the proof first, so it only enables once the capture is finalized, and a failure now shows a toast (it used to be swallowed silently) |
+| **Share link** | a link to the web verifier with only the photo's SHA-256 (`?hash=…`); it preloads the proof, and the recipient still drops the photo itself | the server must already have the capture (enabled once uploaded) |
+| **Proof file** (was "Share proof") | the small `.sakshi.json` proof file: signed manifest, signature, the device's key + attestation chain, Merkle proof and anchor. For checking a photo **without trusting or reaching our API** — the verifier's "Upload a proof bundle file" link, then drop the photo | **yes** — it downloads the proof first, so it only enables once the capture is finalized, and a failure now shows a toast (it used to be swallowed silently) |
 
 Each capture is headed by its signed capture date and time in the phone's local zone (falling back to
 when the row was created if the manifest string ever fails to parse).

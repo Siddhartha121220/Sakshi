@@ -58,6 +58,7 @@ fun CaptureListScreen(
     onRefresh: () -> Unit,
     onSendPhoto: (CaptureEntity, asFile: Boolean) -> Unit,
     onShare: (CaptureEntity) -> Unit,
+    onShareLink: (CaptureEntity) -> Unit,
 ) {
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize()) {
@@ -72,7 +73,7 @@ fun CaptureListScreen(
                 }
             }
             items(captures, key = { it.localId }) { capture ->
-                CaptureRow(capture, onSendPhoto, onShare)
+                CaptureRow(capture, onSendPhoto, onShare, onShareLink)
                 HorizontalDivider()
             }
         }
@@ -102,7 +103,12 @@ private fun SendHint() {
 }
 
 @Composable
-private fun CaptureRow(capture: CaptureEntity, onSendPhoto: (CaptureEntity, Boolean) -> Unit, onShare: (CaptureEntity) -> Unit) {
+private fun CaptureRow(
+    capture: CaptureEntity,
+    onSendPhoto: (CaptureEntity, Boolean) -> Unit,
+    onShare: (CaptureEntity) -> Unit,
+    onShareLink: (CaptureEntity) -> Unit,
+) {
     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Thumbnail(capture.photoFilePath)
@@ -126,12 +132,18 @@ private fun CaptureRow(capture: CaptureEntity, onSendPhoto: (CaptureEntity, Bool
             // Zipped so WhatsApp delivers the exact bytes (it recompresses anything it sees as an image).
             Button(onClick = { onSendPhoto(capture, true) }, modifier = Modifier.weight(1f)) { Text("Send as zip") }
         }
-        OutlinedButton(
-            onClick = { onShare(capture) },
-            enabled = capture.status == CaptureStatus.FINALIZED,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(if (capture.status == CaptureStatus.FINALIZED) "Share proof" else "Share proof (available once verified on-chain)")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            // The link resolves as soon as the server has the capture; the proof file needs the on-chain anchor.
+            OutlinedButton(onClick = { onShareLink(capture) }, enabled = isOnServer(capture.status), modifier = Modifier.weight(1f)) {
+                Text("Share link")
+            }
+            OutlinedButton(onClick = { onShare(capture) }, enabled = capture.status == CaptureStatus.FINALIZED, modifier = Modifier.weight(1f)) {
+                Text("Proof file")
+            }
+        }
+        if (!isOnServer(capture.status) && capture.status != CaptureStatus.FAILED) {
+            Text("Share link works once uploaded; Proof file once verified on-chain.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -209,3 +221,7 @@ internal fun formatCapturedAt(
         .getOrElse { Instant.ofEpochMilli(createdAtEpochMs) }
     return DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm:ss a", locale).withZone(zone).format(instant)
 }
+
+/** True once the server has the capture, i.e. a verification link for it will resolve. */
+internal fun isOnServer(status: CaptureStatus): Boolean =
+    status != CaptureStatus.SIGNED && status != CaptureStatus.QUEUED && status != CaptureStatus.FAILED

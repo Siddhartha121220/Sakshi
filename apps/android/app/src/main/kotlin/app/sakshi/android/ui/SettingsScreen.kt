@@ -40,7 +40,12 @@ fun SettingsScreen(
     onTestConnection: ((String) -> Unit) -> Unit,
     onRetryRegistration: () -> Unit,
     countUnsubmitted: ((Int) -> Unit) -> Unit,
+    verifierUrl: String,
+    defaultVerifierUrl: String,
+    onSaveVerifier: (String) -> String?,
 ) {
+    var verifierDraft by remember(verifierUrl) { mutableStateOf(verifierUrl) }
+    var verifierError by remember { mutableStateOf<String?>(null) }
     var draft by remember(serverUrl) { mutableStateOf(serverUrl) }
     var fieldError by remember { mutableStateOf<String?>(null) }
     var testResult by remember { mutableStateOf<String?>(null) }
@@ -85,6 +90,27 @@ fun SettingsScreen(
         }
         TextButton(onClick = onReset, enabled = serverUrl != defaultServerUrl) { Text("Reset to default") }
         testResult?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+
+        Text("Verifier website", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
+        Text(
+            "Where \"Share link\" sends people to check a photo. The link holds only the photo's fingerprint, " +
+                "so they still need the photo itself.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        OutlinedTextField(
+            value = verifierDraft,
+            onValueChange = { verifierDraft = it; verifierError = null },
+            label = { Text("Verifier address") },
+            singleLine = true,
+            isError = verifierError != null,
+            supportingText = { Text(verifierError ?: "Default: $defaultVerifierUrl") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            onClick = { verifierError = onSaveVerifier(verifierDraft) },
+            enabled = verifierDraft.trim().trimEnd('/') != verifierUrl,
+        ) { Text("Save verifier address") }
 
         Text("Device", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
         when (registration) {

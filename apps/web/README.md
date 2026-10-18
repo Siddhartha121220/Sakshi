@@ -42,6 +42,11 @@ No DOM, no Playwright, no `@testing-library/react` — and deliberately so:
   `createImageBitmap`/`OffscreenCanvas` fakes that model the two spec behaviours involved. The
   Worker wrapper in `hash-worker.ts` remains a manual `pnpm dev` check.
 
+## Verification links
+Opening `/?hash=<sha256>` (what the phone's "Share link" sends) preloads that capture's proof from the
+API and asks for the photo; the verdict still comes from hashing that photo and checking the chain. The
+link carries only the hash (`src/lib/proof-link.ts`).
+
 ## Gotchas hit while building this (left here so they don't get rediscovered)
 - **A closed `ImageBitmap` reports `width`/`height` as 0.** `image-decode.ts` called
   `bitmap.close()` and then read `bitmap.width` for `getImageData`, so every photo failed with

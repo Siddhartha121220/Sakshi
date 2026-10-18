@@ -11,11 +11,12 @@ plugins {
 }
 
 // Per-developer, so it lives in local.properties (gitignored), not in this file.
-val devApiBaseUrl: String = rootProject.file("local.properties")
+val localProps: Properties? = rootProject.file("local.properties")
     .takeIf { it.exists() }
     ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
-    ?.getProperty("sakshi.apiBaseUrl")
-    ?: "http://10.0.2.2:3000"
+val devApiBaseUrl: String = localProps?.getProperty("sakshi.apiBaseUrl") ?: "http://10.0.2.2:3000"
+// Where "Share link" points recipients: the web verifier. Overridable in the app's Settings too.
+val devVerifierUrl: String = localProps?.getProperty("sakshi.verifierUrl") ?: "http://localhost:5173"
 
 android {
     namespace = "app.sakshi.android"
@@ -36,10 +37,12 @@ android {
             // works from an emulator. That address is per-machine, so it lives in local.properties
             // (gitignored) rather than here: sakshi.apiBaseUrl=http://192.168.x.x:3000
             buildConfigField("String", "API_BASE_URL", "\"$devApiBaseUrl\"")
+            buildConfigField("String", "VERIFIER_URL", "\"$devVerifierUrl\"")
         }
         release {
             isMinifyEnabled = false
             buildConfigField("String", "API_BASE_URL", "\"https://api.sakshi.app\"") // placeholder until deployed
+            buildConfigField("String", "VERIFIER_URL", "\"https://verify.sakshi.app\"") // placeholder until deployed
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

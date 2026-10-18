@@ -36,3 +36,19 @@ class BaseUrlInterceptor(private val currentBaseUrl: () -> String) : Interceptor
         return chain.proceed(chain.request().newBuilder().url(rewritten).build())
     }
 }
+
+/** The web verifier's address. Unlike the API it may live under a path (e.g. a GitHub Pages project
+ *  site, https://user.github.io/sakshi/), so a path is kept; a query or fragment is still rejected. */
+fun normalizeVerifierUrl(input: String): String? {
+    val trimmed = input.trim()
+    if (trimmed.isEmpty() || trimmed.any { it.isWhitespace() }) return null
+    val withScheme = if ("://" in trimmed) trimmed else "http://$trimmed"
+    val url = withScheme.toHttpUrlOrNull() ?: return null
+    if (url.scheme != "http" && url.scheme != "https") return null
+    if (url.query != null || url.fragment != null) return null
+    return url.toString().trimEnd('/')
+}
+
+/** "Share link": opens the verifier with this photo's proof preloaded. Carries only the SHA-256 — never
+ *  the photo — so the recipient still needs the photo itself to get a verdict (apps/web proof-link.ts). */
+fun buildVerificationLink(verifierUrl: String, sha256Hex: String): String = "${verifierUrl.trimEnd('/')}/?hash=$sha256Hex"

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseProofBundle, type ProofBundle } from "@sakshi/core";
 import { Dropzone } from "./components/Dropzone.js";
 import { VerdictCard } from "./components/VerdictCard.js";
@@ -7,6 +7,7 @@ import { hashFileInWorker } from "./lib/hash-client.js";
 import { createBrowserChainReader } from "./lib/chain-reader.js";
 import { verifyUploadedFile, type AppVerdict } from "./lib/verify-flow.js";
 import { reportVerificationEvent } from "./lib/api-client.js";
+import { loadLinkedProof, parseProofLinkHash } from "./lib/proof-link.js";
 import type { HashResult } from "./lib/hash-types.js";
 
 type Stage = "idle" | "hashing" | "verifying" | "done" | "error";
@@ -19,15 +20,15 @@ export default function App() {
   const [usedBundle, setUsedBundle] = useState<ProofBundle | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  // Name of a proof file that has been read and is waiting for its photo. Separate from `usedBundle`,
-  // which is "the bundle behind the result on screen" — conflating the two hid the confirmation
-  // whenever a previous result was still showing.
-  const [pendingBundleName, setPendingBundleName] = useState<string | null>(null);
+  // A proof (from a file or a verification link) that is loaded and waiting for its photo. Separate from
+  // `usedBundle`, which is "the bundle behind the result on screen" — conflating the two hid the
+  // confirmation whenever a previous result was still showing.
+  const [pendingBundle, setPendingBundle] = useState<{ title: string; detail: string } | null>(null);
   const providedBundleRef = useRef<ProofBundle | null>(null);
   const bundleInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
-    setPendingBundleName(null); // this photo consumes the loaded proof file (if any)
+    setPendingBundle(null); // this photo consumes the loaded proof file (if any)
     setStage("hashing");
     setVerdict(null);
     setErrorMessage(null);
@@ -64,7 +65,7 @@ export default function App() {
     try {
       const json = JSON.parse(await file.text());
       providedBundleRef.current = parseProofBundle(json);
-      setPendingBundleName(file.name);
+      setPendingBundle({ title: "JSON proof file uploaded", detail: file.name });
       // A new proof file starts a new check: clear the previous result so it can't be mistaken for this one.
       setVerdict(null);
       setUsedBundle(null);
@@ -72,15 +73,38 @@ export default function App() {
       setStage("idle");
     } catch {
       providedBundleRef.current = null; // don't keep an earlier proof file around after a failed load
-      setPendingBundleName(null);
+      setPendingBundle(null);
       setErrorMessage("That doesn't look like a valid Sakshi proof bundle (.sakshi.json).");
       setStage("error");
     }
   }
 
+  // A verification link (?hash=...) preloads that capture's proof; the photo is still required.
+  useEffect(() => {
+    const hash = parseProofLinkHash(window.location.search);
+    if (!hash) return;
+    loadLinkedProof(hash)
+      .then((linked) => {
+        if (linked.kind === "not_found") {
+          setErrorMessage("This verification link points to a photo the server has no proof for (not uploaded yet, or a different Sakshi server).");
+          setStage("error");
+          return;
+        }
+        providedBundleRef.current = linked.bundle;
+        setPendingBundle({
+          title: "Proof loaded from link",
+          detail: linked.capturedAt ? `Photo taken ${new Date(linked.capturedAt).toLocaleString()} (phone's clock)` : `Photo ${hash.slice(0, 16)}…`,
+        });
+      })
+      .catch((err: unknown) => {
+        setErrorMessage(`Couldn't load the proof for this link (${err instanceof Error ? err.message : String(err)}).`);
+        setStage("error");
+      });
+  }, []);
+
   function clearBundle() {
     providedBundleRef.current = null;
-    setPendingBundleName(null);
+    setPendingBundle(null);
   }
 
   const busy = stage === "hashing" || stage === "verifying";
@@ -112,12 +136,12 @@ export default function App() {
           }}
         />
       </p>
-      {pendingBundleName && (
+      {pendingBundle && (
         <div className="bundle-banner" role="status" aria-live="polite">
           <span className="bundle-banner-check" aria-hidden="true">✓</span>
           <div className="bundle-banner-text">
-            <strong>JSON proof file uploaded</strong>
-            <span className="bundle-banner-name">{pendingBundleName}</span>
+            <strong>{pendingBundle.title}</strong>
+            <span className="bundle-banner-name">{pendingBundle.detail}</span>
             <span>Now upload the matching photo above.</span>
           </div>
           <button type="button" className="link-button" onClick={clearBundle}>

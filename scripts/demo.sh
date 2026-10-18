@@ -106,7 +106,11 @@ step "1/5  Local chain (Anvil)"
 # chain mines continuously; this makes the demo behave like one.
 # --state: load the chain from disk and save it back (every second, and on exit), block hashes included,
 # so beacons and anchors from earlier runs still check out.
-start anvil "$LOGS/anvil.log" "$ROOT" anvil --block-time 2 --state "$CHAIN_STATE" --state-interval 1
+# --slots-in-an-epoch 1: Anvil reports "finalized" as two epochs (default 2x32 = 64 blocks) behind the
+# head. A fresh chain is shorter than that, so it reads as genesis and the worker falls back to its own
+# rule; a persisted chain is longer, so photos really did wait ~64 blocks (2+ minutes) to finalize.
+# One-slot epochs make finalized trail by ~2 blocks, close to the fresh-chain behaviour.
+start anvil "$LOGS/anvil.log" "$ROOT" anvil --block-time 2 --slots-in-an-epoch 1 --state "$CHAIN_STATE" --state-interval 1
 rpc_up() { curl -sf -X POST -H 'content-type: application/json' --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' "$RPC"; }
 wait_for "Anvil" 20 rpc_up
 

@@ -9,7 +9,9 @@ import app.sakshi.android.camera.ImageDecode
 import app.sakshi.android.data.CaptureEntity
 import app.sakshi.android.data.createShareZip
 import app.sakshi.android.data.saveToGallery
+import app.sakshi.android.network.buildVerificationLink
 import app.sakshi.android.network.normalizeServerUrl
+import app.sakshi.android.network.normalizeVerifierUrl
 import app.sakshi.android.work.UploadWorker
 import app.sakshi.protocol.Location
 import app.sakshi.protocol.PHash
@@ -38,6 +40,20 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     private val _serverUrl = MutableStateFlow(serverSettings.baseUrl)
     val serverUrl: StateFlow<String> = _serverUrl
     val defaultServerUrl: String get() = serverSettings.defaultBaseUrl
+
+    private val _verifierUrl = MutableStateFlow(serverSettings.verifierUrl)
+    val verifierUrl: StateFlow<String> = _verifierUrl
+    val defaultVerifierUrl: String get() = serverSettings.defaultVerifierUrl
+
+    /** Returns an error message for the field, or null when saved. */
+    fun saveVerifierUrl(input: String): String? {
+        val url = normalizeVerifierUrl(input) ?: return "Not a valid web address (e.g. https://verify.example.com)."
+        serverSettings.verifierUrl = url
+        _verifierUrl.value = url
+        return null
+    }
+
+    fun verificationLinkFor(capture: CaptureEntity): String = buildVerificationLink(serverSettings.verifierUrl, capture.sha256Hex)
 
     private val _registration = MutableStateFlow<RegistrationState>(RegistrationState.Checking)
     val registration: StateFlow<RegistrationState> = _registration

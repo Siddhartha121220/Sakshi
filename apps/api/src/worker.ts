@@ -45,9 +45,10 @@ async function pollFinality(deps: WorkerDeps): Promise<void> {
   let finalizedBlockNumber: bigint;
   try {
     const finalizedBlock = await deps.wallet.publicClient.getBlock({ blockTag: "finalized" });
-    // ponytail: Anvil doesn't reject the 'finalized' tag — it silently always returns genesis
-    // (block 0), which would never satisfy a real batch. Treat "finalized == 0 while the chain has
-    // moved on" as "this chain doesn't really support finality" and use the fallback instead.
+    // ponytail: Anvil answers the 'finalized' tag with head - 2 epochs (64 blocks by default), clamped to
+    // genesis — so on a young local chain it returns block 0 forever-ish, which no batch can satisfy.
+    // Treat "finalized == 0 while the chain has moved on" as "no usable finality here" and use the
+    // fallback. (scripts/demo.sh runs Anvil with one-slot epochs so a long-lived chain finalizes fast.)
     // Upgrade path: drop this check once only pointed at real networks with genuine finality.
     finalizedBlockNumber = finalizedBlock.number === 0n && latest > 0n ? -1n : finalizedBlock.number;
   } catch {

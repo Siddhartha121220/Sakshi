@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
                     val captures by viewModel.captures.collectAsState()
                     val serverUrl by viewModel.serverUrl.collectAsState()
                     val refreshing by viewModel.refreshing.collectAsState()
+                    val verifierUrl by viewModel.verifierUrl.collectAsState()
 
                     Scaffold(
                         bottomBar = {
@@ -105,6 +106,9 @@ class MainActivity : ComponentActivity() {
                                     onTestConnection = viewModel::testConnection,
                                     onRetryRegistration = viewModel::retryRegistration,
                                     countUnsubmitted = viewModel::unsubmittedCount,
+                                    verifierUrl = verifierUrl,
+                                    defaultVerifierUrl = viewModel.defaultVerifierUrl,
+                                    onSaveVerifier = viewModel::saveVerifierUrl,
                                 )
                             } else {
                                 when (val state = registration) {
@@ -125,6 +129,7 @@ class MainActivity : ComponentActivity() {
                                             captures = captures,
                                             refreshing = refreshing,
                                             onRefresh = viewModel::refresh,
+                                            onShareLink = { capture -> shareText(viewModel.verificationLinkFor(capture)) },
                                             onSendPhoto = { capture, asFile -> sendPhoto(java.io.File(capture.photoFilePath), asFile) },
                                             onShare = { capture ->
                                                 viewModel.exportAndShare(
@@ -177,6 +182,15 @@ class MainActivity : ComponentActivity() {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(intent, title))
+    }
+
+    /** "Share link": plain text, so it pastes anywhere (WhatsApp, email, notes). */
+    private fun shareText(link: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "Check this photo with Sakshi (you'll need the photo itself too): $link")
+        }
+        startActivity(Intent.createChooser(intent, "Share verification link"))
     }
 
     private fun shareFile(file: java.io.File) {

@@ -18,7 +18,15 @@ class ServerSettings(context: Context) {
 
     fun resetToDefault() = prefs.edit().remove(KEY_BASE_URL).apply()
 
+    val defaultVerifierUrl: String get() = BuildConfig.VERIFIER_URL
+
+    /** Where "Share link" sends recipients (the web verifier). */
+    var verifierUrl: String
+        get() = prefs.getString(KEY_VERIFIER_URL, null) ?: defaultVerifierUrl
+        set(value) = prefs.edit().putString(KEY_VERIFIER_URL, value).apply()
+
     private companion object {
         const val KEY_BASE_URL = "base_url"
+        const val KEY_VERIFIER_URL = "verifier_url"
     }
 }

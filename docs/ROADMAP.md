@@ -44,7 +44,7 @@ Legend: ☐ todo · ◐ in progress · ☑ done
 - ☑ Device request-signature middleware (`src/lib/device-auth.ts`, PROTOCOL §9)
 - ☑ Captures: submit, get, by-hash, status, search-similar
 - ☑ Time-beacon endpoint
-- ☑ Anchor worker: batching, advisory lock, crash recovery, stuck-tx replacement (fee bump, same nonce), finality tracking (with an Anvil-specific fallback — Anvil never rejects `blockTag: 'finalized'`, it just always returns genesis)
+- ☑ Anchor worker: batching, advisory lock, crash recovery, stuck-tx replacement (fee bump, same nonce), finality tracking (with an Anvil-specific fallback — Anvil never rejects `blockTag: 'finalized'`: it reports head minus two epochs, which reads as genesis on a young chain)
 - ☑ Integration tests: real local Anvil + an embedded Postgres-compatible DB (no Docker, no real Postgres install needed) — covers the full register → submit → batch → anchor → confirm → finalize → verify path, multi-capture batching, duplicate-image rejection, and on-chain device revocation
 - **Exit:** met — `apps/api/scripts/fake-device.ts` submits N captures against a running API and they anchor and verify; exercised directly in the integration tests (27 tests passing) and once manually as separate OS processes (which is how the viem block-number caching bug and a `process.argv[1]` entrypoint bug were actually found — see `apps/api/README.md`'s gotchas section)
 
@@ -84,6 +84,12 @@ Legend: ☐ todo · ◐ in progress · ☑ done
   Uploaded → Anchored → Verified on-chain) with a plain next-step line, pull-to-refresh that syncs
   immediately, and a hint explaining which send button keeps AUTHENTIC. Logic unit-tested; the screens
   themselves not yet looked at on a device
+- ☑ Verification links: "Share link" sends `<verifier>/?hash=<sha256>` (hash only, never the photo); the
+  verifier preloads that capture's proof and still needs the photo itself. Tested end to end in a
+  browser: link → proof preloaded → matching photo → AUTHENTIC; unknown and malformed links handled.
+  Link format pinned by matching tests in Kotlin and TypeScript
+- ☑ Fixed: on a persisted chain Anvil's "finalized" trails the head by 64 blocks, so photos took 2+
+  minutes to finalize; one-slot epochs bring it to ~2 blocks (44 s end to end, measured)
 - ☑ `scripts/demo.sh` — one command for the whole local demo (chain, deploy, DB, API + worker, web, phone
   over USB via `adb reverse`, so phone and laptop needn't share a network)
 - ☑ Opt-in location — written, not yet run

@@ -40,6 +40,8 @@ export async function registerFakeDevice(baseUrl: string): Promise<FakeDevice> {
 
 export interface SubmitCaptureOptions {
   withBeacon?: boolean;
+  /** Real photo bytes to commit to (e.g. a JPEG for a browser test); random bytes otherwise. */
+  photoBytes?: Uint8Array;
 }
 
 export interface SubmittedCapture {
@@ -55,7 +57,7 @@ export async function submitFakeCapture(
   device: FakeDevice,
   opts: SubmitCaptureOptions = {},
 ): Promise<SubmittedCapture> {
-  const fakePhotoBytes = crypto.getRandomValues(new Uint8Array(32)); // stands in for a real JPEG
+  const fakePhotoBytes = opts.photoBytes ?? crypto.getRandomValues(new Uint8Array(32)); // stands in for a real JPEG
   const sha256Hex = toHex(await sha256(fakePhotoBytes));
 
   let beacon: Manifest["beacon"];

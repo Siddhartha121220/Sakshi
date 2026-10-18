@@ -11,18 +11,27 @@ JSON, signature encoding) — see `../protocol/README.md`.
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
+### Easiest: the demo script
+`scripts/demo.sh` (repo root) starts the chain, deploys the contract, starts the DB, API + worker and
+web verifier, runs `adb reverse tcp:3000 tcp:3000`, and resets + reinstalls the app. With the debug URL
+set to `http://127.0.0.1:3000` (below) the phone reaches the laptop **over the USB cable**, so the two
+don't need to share a network and the laptop's IP can change freely.
+
 ### Pointing the debug build at your API
 The debug build's API base URL comes from `apps/android/local.properties` (gitignored, so each
 developer's own address stays out of the repo):
 ```properties
-sakshi.apiBaseUrl=http://192.168.1.42:3000   # your dev machine's LAN IP
+sakshi.apiBaseUrl=http://127.0.0.1:3000      # via `adb reverse` over USB; or your laptop's LAN IP over Wi-Fi
 ```
 Defaults to `http://10.0.2.2:3000` (the host loopback as seen from an **emulator**) when unset — a
 real phone can't reach that, so a physical device needs the LAN IP and must be on the same network.
 The debug source set also permits cleartext HTTP (`src/debug/res/xml/network_security_config.xml`);
 release builds don't include that file and stay HTTPS-only.
-No unit/instrumented test suite here yet (see **What's verified** below) — `:protocol`'s tests are
-what covers the byte-level logic this module calls into.
+```bash
+./gradlew :app:testDebugUnitTest   # plain JVM unit tests: "Send as zip" is byte-exact, capture-date formatting
+```
+No instrumented (on-device) test suite yet — `:protocol`'s tests cover the byte-level logic this module
+calls into, and the rest was verified by hand on a real phone (see **What's verified** below).
 
 ## Structure
 | Package | What's in it |
@@ -57,15 +66,60 @@ what covers the byte-level logic this module calls into.
   the server accepted the device without checking its chain. The chain is real and now verifies
   offline in `apps/api/test/real-attestation.test.ts`, but the live path hasn't rejected or
   accepted a real device on its own merits yet.
-- **The share sheet / bundle export UI** — the proof bundle was pulled over ADB instead.
+- **The share sheet** — both "Send photo" and "Share proof" are written and compile, but neither has been tapped on a device.
 - Opt-in location, and the Compose UI beyond the capture and list screens.
 
-## Getting a capture off the device
-Photos deliberately never reach the gallery (invariant #5 — there is no gallery path in or out),
-so pull them over ADB. They live in the app's private cache; the proof bundle sits beside them:
+## The three buttons on each capture
+| Button | What it sends | Needs the server? |
+|---|---|---|
+| **Send photo** | the signed JPEG as an ordinary image (WhatsApp recompresses it → verifier says `SIMILAR_TO_AUTHENTIC`) | no |
+| **Send as zip** | the same JPEG inside a `.zip`, byte-for-byte (recipient unzips → verifier can say `AUTHENTIC`) | no |
+| **Share proof** | the small `.sakshi.json` proof file: signed manifest, signature, the device's key + attestation chain, Merkle proof and anchor. For checking a photo **without trusting or reaching our API** — the verifier's "Upload a proof bundle file" link, then drop the photo | **yes** — it downloads the proof first, so it only enables once the capture is finalized, and a failure now shows a toast (it used to be swallowed silently) |
+
+Each capture is headed by its signed capture date and time in the phone's local zone (falling back to
+when the row was created if the manifest string ever fails to parse).
+
+## Sending a photo, and the gallery copy
+Each capture in "My captures" has two buttons (any status — the verifier finds the proof by the photo's
+hash, so a photo can go out before it's anchored):
+- **Send photo** — `image/jpeg`. Apps like WhatsApp recompress and strip this, so the recipient's bytes no
+  longer match the signature and the verifier can only answer `SIMILAR_TO_AUTHENTIC`, never `AUTHENTIC`
+  (invariant #7). That is the designed behaviour of the perceptual path, not a bug.
+- **Send as zip** — the JPEG inside a zip. WhatsApp always delivers a zip as an opaque document, so the
+  photo's bytes arrive untouched; the recipient unzips it and drops the JPEG on the verifier →
+  `AUTHENTIC`. Verified: zip → unzip returns the identical SHA-256, and the gallery copy's hash is one the
+  server recognises. **Not yet verified through WhatsApp itself.**
+
+**What did not work (don't retry it):** the first "send as file" set a generic MIME type
+(`application/octet-stream`) on the share intent. On the OnePlus test phone WhatsApp still sent the
+capture as an image — a 1,155,822-byte original arrived as a 75,155-byte `IMG-…-WA….jpg`. Most likely
+WhatsApp asks the FileProvider for the type, which derives `image/jpeg` from the `.jpg` extension; that
+reason is a guess, the result is observed. Wrapping the file in a zip sidesteps type detection entirely.
+
+**Measured, not assumed:** I recompressed the real OnePlus capture the way WhatsApp roughly does (long
+edge 1600/1280/800 px, JPEG q75/q60/q50, metadata stripped) and ran `@sakshi/core`'s own pHash on each:
+Hamming distance **0** from the original every time (match cutoff is 14, PROTOCOL.md §8.1); negative
+controls (mirrored, cropped, rotated, noise) landed at 28-32. So a WhatsApp-recompressed photo should
+verify as `SIMILAR_TO_AUTHENTIC`. Caveats: that is a PIL approximation of WhatsApp's pipeline, one photo,
+not real WhatsApp output — real calibration is docs/ROADMAP.md Phase 7.
+
+**Gallery copy.** Every new capture is also saved byte-for-byte to `Pictures/Sakshi` (`GallerySave.kt`,
+no permission needed on Android 10+; skipped on Android 9, where it would need a storage permission).
+This is export only: nothing reads the gallery back, so invariant #5 (no gallery *import*) holds — the
+signature still covers the app-private original in `files/photos/`, and an edited gallery copy is just an
+unsigned file. Captures taken before this change aren't backfilled. Neither the gallery save nor the
+share buttons have been run on a device.
+
+Photos live in `files/photos/` (they used to be in `cache/`, which the OS may purge — and the signature
+covers that file). Older captures are still in `cache/`; the file provider covers both. A purged photo
+makes Send say so instead of failing silently.
+
+## Getting a capture off the device over ADB
+Photos can also be pulled over ADB. (Nothing is ever *imported* from the gallery — invariant #5.) New captures are in `files/photos/`, older ones in `cache/`; the proof bundle
+sits in `files/bundles/`:
 ```bash
-adb shell run-as app.sakshi ls cache/                    # sakshi-capture-<epochMillis>.jpg
-adb exec-out run-as app.sakshi cat cache/<name>.jpg > capture.jpg
+adb shell run-as app.sakshi ls files/photos/ cache/      # sakshi-capture-<epochMillis>.jpg
+adb exec-out run-as app.sakshi cat files/photos/<name>.jpg > capture.jpg
 adb shell run-as app.sakshi ls files/bundles/            # <sha256>.sakshi.json
 ```
 `adb pull` can't reach app-private storage on a non-rooted device, and `run-as ... cp` into

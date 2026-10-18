@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,9 +71,23 @@ class MainActivity : ComponentActivity() {
                                         onLocationOptInChanged = { locationOptedIn = it },
                                         onPhotoCaptured = { file -> viewModel.onPhotoCaptured(file, locationOptedIn) },
                                     )
-                                    Screen.LIST -> CaptureListScreen(captures = captures, onShare = { capture ->
-                                        viewModel.exportAndShare(capture.localId) { file -> shareFile(file) }
-                                    })
+                                    Screen.LIST -> CaptureListScreen(
+                                        captures = captures,
+                                        onSendPhoto = { capture, asFile -> sendPhoto(java.io.File(capture.photoFilePath), asFile) },
+                                        onShare = { capture ->
+                                            viewModel.exportAndShare(
+                                                capture.localId,
+                                                onReady = { file -> shareFile(file) },
+                                                onError = { reason ->
+                                                    Toast.makeText(
+                                                        this@MainActivity,
+                                                        "Couldn't fetch the proof from the server ($reason). Is it reachable?",
+                                                        Toast.LENGTH_LONG,
+                                                    ).show()
+                                                },
+                                            )
+                                        },
+                                    )
                                 }
                             }
                         }
@@ -80,6 +95,35 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** "Send photo" shares the JPEG as an image: apps like WhatsApp recompress and strip it, so the recipient's
+     *  bytes no longer match the signature and the verifier can only say SIMILAR_TO_AUTHENTIC.
+     *  "Send as zip" shares it inside a zip, which those apps deliver untouched — the only route to AUTHENTIC. */
+    private fun sendPhoto(file: java.io.File, asFile: Boolean) {
+        if (!file.exists()) {
+            Toast.makeText(this, "This photo is no longer stored on the device.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (asFile) {
+            viewModel.prepareFileShare(
+                file,
+                onReady = { zip -> startShare(zip, "application/zip", "Send original (zip)") },
+                onError = { Toast.makeText(this, "Couldn't prepare the file: $it", Toast.LENGTH_LONG).show() },
+            )
+        } else {
+            startShare(file, "image/jpeg", "Send photo")
+        }
+    }
+
+    private fun startShare(file: java.io.File, mimeType: String, title: String) {
+        val uri = FileProvider.getUriForFile(this, "app.sakshi.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mimeType
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(intent, title))
     }
 
     private fun shareFile(file: java.io.File) {

@@ -25,12 +25,13 @@ packages/core       Shared TS: protocol, pHash, merkle, verify(); test-vectors/ 
 pnpm install                         # all TS workspaces
 pnpm -r test                         # all TS tests — apps/api spins up its own Anvil + embedded DB per file, no setup needed
 pnpm -r typecheck
+scripts/demo.sh                      # whole local demo in one go: chain, deploy, DB, API+worker, web, phone (see header for flags)
 pnpm --filter api db:migrate         # dbmate up — real deployments only; tests don't need this
 pnpm --filter api dev:db             # embedded dev Postgres; prints the DATABASE_URL for .env
 pnpm --filter api dev:all            # API + anchor worker in ONE process (see below)
 pnpm --filter web dev                # verifier (needs apps/web/.env.local — see .env.example)
 cd packages/contracts && forge test -vvv && forge coverage
-cd apps/android && ./gradlew :protocol:test && ./gradlew :app:assembleDebug
+cd apps/android && ./gradlew :protocol:test :app:testDebugUnitTest :app:assembleDebug
 ```
 No Docker: local dev and tests use Anvil (via Foundry) directly, and `apps/api`'s tests use an
 embedded Postgres-compatible DB (see `apps/api/README.md`) — nothing left for Docker to wrap.
@@ -45,7 +46,7 @@ production runs.
 2. **P-256, not secp256k1.** Android Keystore can't do secp256k1. Signatures are DER on the wire; convert to raw r‖s only for WebCrypto.
 3. **No floats in manifests.** Coordinates are strings; integers < 2^53.
 4. **Photos never go on-chain and never reach the server** unless the user explicitly publishes them.
-5. **No gallery import** in the Android app, anywhere. Signing happens only in the capture callback.
+5. **No gallery import** in the Android app, anywhere. Signing happens only in the capture callback. Saving a copy *out* to the gallery is fine (export, nothing reads it back); importing *from* it never is.
 6. **The verifier trusts the chain, not our API.** The web app reads roots, revocations, and block hashes from its own RPC. The API only delivers bundles.
 7. **The perceptual path never returns `AUTHENTIC`.** Only `SIMILAR_TO_AUTHENTIC`.
 8. **Kotlin and TS must agree byte-for-byte.** Any hashing or encoding change needs updated vectors in `packages/core/test-vectors/`, passing on both sides. One confirmed exception, not a bug: pHash on a numerically-degenerate synthetic image (all DCT coefficients near the float noise floor) can flip a handful of bits between Java's and V8's `cos()` — see `apps/android/protocol/src/test/kotlin/.../PHashTest.kt`'s `KNOWN_FLOATING_POINT_EDGE_CASES`. Real photos don't hit this; three of the four shared vectors (including ones with real structure) match bit-for-bit.

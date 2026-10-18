@@ -69,7 +69,10 @@ fun CaptureScreen(
                 enabled = !processing,
                 onClick = {
                     val capture = imageCapture ?: return@Button
-                    val file = File(context.cacheDir, "sakshi-capture-${System.currentTimeMillis()}.jpg")
+                    // filesDir, not cacheDir: the system may purge the cache under storage pressure, and this
+                    // file is what the signature covers — losing it makes the capture unshareable/unverifiable.
+                    val photosDir = File(context.filesDir, "photos").apply { mkdirs() }
+                    val file = File(photosDir, "sakshi-capture-${System.currentTimeMillis()}.jpg")
                     val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
                     capture.takePicture(
                         outputOptions,

@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import app.sakshi.android.SakshiApplication
 import app.sakshi.android.camera.ImageDecode
 import app.sakshi.android.data.CaptureEntity
+import app.sakshi.android.data.createShareZip
+import app.sakshi.android.data.saveToGallery
 import app.sakshi.android.work.UploadWorker
 import app.sakshi.protocol.Location
 import app.sakshi.protocol.PHash
@@ -75,6 +77,8 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 val location = if (locationOptedIn) fetchCoarseLocation() else null
 
                 repository.signCapture(photoFile, jpegBytes, image.width, image.height, phashHex, tileHexes, beacon, location)
+                // A convenience copy only — a failure here must never fail the capture itself.
+                withContext(Dispatchers.IO) { runCatching { saveToGallery(getApplication(), photoFile) } }
                 UploadWorker.runNow(getApplication())
             } finally {
                 _processing.value = false
@@ -82,9 +86,23 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun exportAndShare(localId: String, onReady: (File) -> Unit) {
+    /** Zips the photo on a background thread and hands the zip to [onReady] (see ShareZip.kt for why). */
+    fun prepareFileShare(photo: File, onReady: (File) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            runCatching { repository.exportBundle(localId) }.onSuccess(onReady)
+            val result = runCatching { withContext(Dispatchers.IO) { createShareZip(File(getApplication<Application>().cacheDir, "shared"), photo) } }
+            result.getOrNull()?.let(onReady)
+            result.exceptionOrNull()?.let { onError(it.message ?: it.javaClass.simpleName) }
+        }
+    }
+
+    /** Fetches the proof from the server and hands the written file to [onReady]; any failure goes to
+     *  [onError] with a human-readable reason rather than being swallowed (it used to be, which made the
+     *  "Share proof" button look dead whenever the server was unreachable). */
+    fun exportAndShare(localId: String, onReady: (File) -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = runCatching { repository.exportBundle(localId) }
+            result.getOrNull()?.let(onReady)
+            result.exceptionOrNull()?.let { onError(it.message ?: it.javaClass.simpleName) }
         }
     }
 

@@ -67,8 +67,14 @@ Legend: ☐ todo · ◐ in progress · ☑ done
   edge case on a numerically-degenerate synthetic image — see `CONTRIBUTING.md` invariant #8.
 - ☑ Room DB + WorkManager upload queue (offline-first) — ran on device; captures queued and uploaded
 - ☑ Time-beacon refresh; status polling — ran on device (status reached `finalized`)
-- ☑ Bundle export; "share as file" — written; on-device the bundle was pulled over ADB rather than
-  through the share sheet, so the share UI itself is still unexercised
+- ☑ Bundle export ("Share proof") — used on device; failures now show a toast instead of being swallowed
+- ☑ Sharing the photo: "Send photo" (image, recompressed by WhatsApp → SIMILAR_TO_AUTHENTIC) and
+  "Send as zip" (exact bytes → AUTHENTIC; byte-exactness unit-tested in `:app`, WhatsApp delivery of the
+  zip itself not yet confirmed); a generic-MIME "send as file" was tried first and observed NOT to work
+- ☑ Gallery copy of every new capture (`Pictures/Sakshi`, export only — invariant #5 holds); capture date
+  and time shown on each capture
+- ☑ `scripts/demo.sh` — one command for the whole local demo (chain, deploy, DB, API + worker, web, phone
+  over USB via `adb reverse`, so phone and laptop needn't share a network)
 - ☑ Opt-in location — written, not yet run
 - **Exit: MET (local chain).** On 2026-10-03 a photo was taken in the app on a physical OnePlus
   CPH2381, signed with a real TEE-backed Keystore key, uploaded, Merkle-batched, anchored and

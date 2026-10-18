@@ -10,5 +10,6 @@ Two Gradle modules:
 
 ```bash
 ./gradlew :protocol:test
+./gradlew :app:testDebugUnitTest
 ./gradlew :app:assembleDebug
 ```

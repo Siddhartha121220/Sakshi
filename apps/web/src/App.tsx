@@ -19,10 +19,15 @@ export default function App() {
   const [usedBundle, setUsedBundle] = useState<ProofBundle | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  // Name of a proof file that has been read and is waiting for its photo. Separate from `usedBundle`,
+  // which is "the bundle behind the result on screen" — conflating the two hid the confirmation
+  // whenever a previous result was still showing.
+  const [pendingBundleName, setPendingBundleName] = useState<string | null>(null);
   const providedBundleRef = useRef<ProofBundle | null>(null);
   const bundleInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
+    setPendingBundleName(null); // this photo consumes the loaded proof file (if any)
     setStage("hashing");
     setVerdict(null);
     setErrorMessage(null);
@@ -59,11 +64,23 @@ export default function App() {
     try {
       const json = JSON.parse(await file.text());
       providedBundleRef.current = parseProofBundle(json);
-      setUsedBundle(providedBundleRef.current);
+      setPendingBundleName(file.name);
+      // A new proof file starts a new check: clear the previous result so it can't be mistaken for this one.
+      setVerdict(null);
+      setUsedBundle(null);
+      setErrorMessage(null);
+      setStage("idle");
     } catch {
+      providedBundleRef.current = null; // don't keep an earlier proof file around after a failed load
+      setPendingBundleName(null);
       setErrorMessage("That doesn't look like a valid Sakshi proof bundle (.sakshi.json).");
       setStage("error");
     }
+  }
+
+  function clearBundle() {
+    providedBundleRef.current = null;
+    setPendingBundleName(null);
   }
 
   const busy = stage === "hashing" || stage === "verifying";
@@ -95,7 +112,19 @@ export default function App() {
           }}
         />
       </p>
-      {usedBundle && stage !== "done" && <p className="bundle-loaded-note">Bundle loaded — now drop the matching photo above.</p>}
+      {pendingBundleName && (
+        <div className="bundle-banner" role="status" aria-live="polite">
+          <span className="bundle-banner-check" aria-hidden="true">✓</span>
+          <div className="bundle-banner-text">
+            <strong>JSON proof file uploaded</strong>
+            <span className="bundle-banner-name">{pendingBundleName}</span>
+            <span>Now upload the matching photo above.</span>
+          </div>
+          <button type="button" className="link-button" onClick={clearBundle}>
+            Remove
+          </button>
+        </div>
+      )}
 
       {stage === "hashing" && <p className="status-line" aria-live="polite">Hashing {fileName}…</p>}
       {stage === "verifying" && <p className="status-line" aria-live="polite">Checking the chain…</p>}

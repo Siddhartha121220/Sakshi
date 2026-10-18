@@ -86,9 +86,41 @@ header h1 {
   text-decoration: underline;
 }
 
-.bundle-loaded-note {
-  text-align: center;
-  color: var(--info);
+.bundle-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--good);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--good) 12%, var(--surface));
+}
+
+.bundle-banner-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--good);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.bundle-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bundle-banner-name {
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
 
 .status-line {

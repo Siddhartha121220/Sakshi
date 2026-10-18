@@ -2,4 +2,8 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Exported proof bundles (FR-M7, "share as file") live in the app's own files dir. -->
     <files-path name="bundles" path="bundles/" />
+    <!-- Captured photos, shared out via the chooser ("Send photo"). Nothing is ever imported from the gallery. -->
+    <files-path name="photos" path="photos/" />
+    <!-- cache dir: "Send as zip" archives (cache/shared/), plus captures taken before photos moved to filesDir. -->
+    <cache-path name="legacy_photos" path="." />
 </paths>

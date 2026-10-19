@@ -2,14 +2,16 @@
 
 **Photos that can prove they're real.**
 
-Sakshi (Sanskrit for *witness*) signs every photo inside your phone's security chip the moment it's taken, and anchors its fingerprint on a public blockchain. Anyone can later check that a photo is **unedited**, came from a **genuine phone camera**, and was taken **within a proven time window**, without having to trust the people who run Sakshi.
+Sakshi (Sanskrit for *witness*) signs every photo inside your phone's security chip the moment it's taken, and anchors its fingerprint on a public blockchain. Anyone can later check that a photo is **unedited**, came from a **genuine phone camera**, and was taken **within a proven time window**. The verdict is computed in the verifier's own browser against the public chain, not handed down by a server.
+
+> **Testnet demo, not a production service.** See [Disclaimers](#disclaimers) before relying on it for anything.
 
 **Live on the Base Sepolia testnet:**
 
 | | |
 |---|---|
 | Verifier website | https://siddhartha121220.github.io/Sakshi/ |
-| API | https://sakshi-65ve.onrender.com (free tier: the first request after a quiet spell takes about 50 s) |
+| API | https://sakshi-65ve.onrender.com (free tier: the first request after a quiet spell takes about 50 s; rate-limited, see [Disclaimers](#disclaimers)) |
 | Smart contract | [`0xf412dE9954A9d8caa35a0B6c1c6E193703765B51`](https://sepolia.basescan.org/address/0xf412dE9954A9d8caa35a0B6c1c6E193703765B51) on Base Sepolia (chain 84532) |
 
 ---
@@ -32,9 +34,9 @@ AI can fake any photo in seconds. That breaks trust in two directions: fakes pas
 ```
 
 1. **Register.** On first launch the phone generates a P-256 key inside its secure hardware (TEE or StrongBox), where it can never be copied out. Android Key Attestation proves to the server, through a certificate chain ending at Google's root, that the key is genuine, the phone is locked with verified boot, and it belongs to the real Sakshi app.
-2. **Capture.** The in-app camera hashes the photo (SHA-256, plus a perceptual hash and 16 tile hashes) and builds a small manifest. It includes a **time beacon**, a recent block hash that can't be known in advance. The hardware key signs that manifest. The photo itself never leaves the phone.
+2. **Capture.** The in-app camera hashes the photo (SHA-256, plus a perceptual hash and 16 tile hashes) and builds a small manifest. It includes a **time beacon**, a recent block hash that can't be known in advance. The hardware key signs that manifest. The photo itself is never sent to the server; only the fingerprints and signature are.
 3. **Anchor.** The server batches all new fingerprints into one Merkle tree and writes only its 32-byte root to the `SakshiAnchor` contract. One cheap transaction covers any number of photos, and nobody, including us, can change or backdate it.
-4. **Verify.** Drop a photo on the website. It's hashed **in your browser** (never uploaded), then the signature, the Merkle proof and the on-chain root are checked against the chain directly. The server only delivers proofs; it's never trusted for the verdict.
+4. **Verify.** Drop a photo on the website. It's hashed **in your browser** (never uploaded), then the signature, the Merkle proof, the on-chain root, device revocation and the time beacon are checked against the chain directly. The server only delivers the proof file. One thing the browser does **not** yet re-check is the phone's attestation certificate chain: that the signing key lives in genuine hardware is verified by the server at registration (re-checking it in the browser is planned; see [Known limitations](#known-limitations)).
 
 **Proven time window:** the beacon proves the photo wasn't signed *before* a certain block, and the anchor proves it existed *by* a later block. Both come from the chain, so neither the phone's clock nor the server can fake them.
 
@@ -50,16 +52,16 @@ AI can fake any photo in seconds. That breaks trust in two directions: fakes pas
 
 | Button | What it sends | Verifier result |
 |---|---|---|
-| **Send as zip** | The exact original inside a zip, which messaging apps deliver untouched | ✅ Authentic (after unzipping) |
+| **Send as zip** | The exact original inside a zip; messaging apps send zips as documents instead of recompressing them | ✅ Authentic (after unzipping) |
 | **Send photo** | An ordinary image. WhatsApp and similar apps recompress it | 🟦 Similar to authentic |
 | **Share link** | A verifier link holding only the photo's fingerprint, never the photo. The recipient still needs the photo itself | Preloads the proof |
 | **Proof file** | A `.sakshi.json` proof that works even if the Sakshi server is offline | Upload it, then the photo |
 
-Every photo is also saved to the phone's gallery (`Pictures/Sakshi`), so it isn't lost if the app is removed.
+On Android 10 and newer, every new photo is also saved to the phone's gallery (`Pictures/Sakshi`), so it isn't lost if the app is removed.
 
 ## Try it
 
-**Install the app (Android 9+).** [**Download Sakshi.apk**](https://github.com/Siddhartha121220/Sakshi/releases/latest/download/Sakshi.apk) — it points at the live server by default, so no setup is needed. On the phone, allow "install unknown apps" for wherever you opened the file, install it, and grant camera access. It registers itself automatically. (This is a debug build, not a Play Store release — Android will warn you it's from an unverified developer; that's expected for a student project shared this way.)
+**Install the app (Android 9+).** [**Download Sakshi.apk**](https://github.com/Siddhartha121220/Sakshi/releases/latest/download/Sakshi.apk) — it points at the live server by default, so no setup is needed. On the phone, allow "install unknown apps" for wherever you opened the file, install it, and grant camera access. It registers itself automatically. (This is a debug build, not a Play Store release, so Android or Play Protect may warn that it's from an unknown developer. That's expected for an app shared this way; see [Disclaimers](#disclaimers).)
 
 You can also build it yourself from source (below).
 
@@ -146,7 +148,7 @@ cd packages/contracts && forge test             # Solidity: unit, fuzz, invarian
 cd apps/android && ./gradlew :protocol:test :app:testDebugUnitTest
 ```
 
-The suites run against real dependencies rather than mocks: a real local chain, an embedded Postgres-compatible database, real cryptography, and an Android attestation chain captured from a physical phone. The Kotlin and TypeScript implementations share test vectors, so both produce byte-identical hashes and signatures.
+The suites run against real dependencies rather than mocks: a real local chain, an embedded Postgres-compatible database, real cryptography, and an Android attestation chain captured from a physical phone. The Kotlin and TypeScript implementations share test vectors and agree byte-for-byte on hashing and encoding (with one documented floating-point edge case on a synthetic test image; see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Tech stack
 
@@ -186,6 +188,17 @@ docs/               Design docs
 ## Known limitations
 
 - **The "analog hole":** photographing a screen or print that shows a fake isn't detected. Sakshi proves the camera captured *something*, not that the scene was genuine.
+- **Attestation is checked by the server, not yet by the browser.** The verifier proves the photo matches a signature that was anchored on-chain, but it takes the server's word that the signing key came from genuine phone hardware. A dishonest operator could therefore register a software key. Re-verifying the attestation chain in the browser closes this and is on the roadmap.
 - **Android only.** Tested on one phone so far (TEE key); StrongBox hardware and other manufacturers are untested.
 - **Testnet.** Runs on Base Sepolia, not mainnet. The free API tier sleeps when idle.
 - **Uncalibrated similarity cutoff.** The perceptual-match threshold still needs calibrating on a large image set.
+
+## Disclaimers
+
+- **Educational project, testnet only.** Sakshi is a student project running on the Base Sepolia **test** network. Its tokens have no monetary value; never send real funds to any address shown here. It is not audited and has not been reviewed by a lawyer. Don't rely on it as legal, insurance or forensic evidence.
+- **The live demo is best-effort.** The API and database run on free hosting tiers with no uptime guarantee. The API sleeps after about 15 minutes idle (the next request takes about 50 s), and the demo data may be reset or deleted at any time.
+- **Rate limits.** To keep the free services usable, the API allows about **300 requests per minute per IP address**, and **30 per minute** for the anonymous verification-event endpoint. Over the limit you get HTTP `429 RATE_LIMITED`; wait a minute and retry.
+- **What is stored, and where.** Photos are never uploaded. The server stores each capture's fingerprints (SHA-256, perceptual and tile hashes), its signed manifest and signature, the device's public key and attestation certificates, and the location **only if you turned it on** (rounded to about 100 m). The verifier sends anonymous result counts, stored without your IP address or any photo data (the hosting provider may still keep its own short-lived access logs). On-chain, only Merkle roots are published, and they are **permanent**: blockchain records can't be deleted.
+- **Fingerprints can identify a photo.** Anyone who has a copy of a photo can check whether it was registered, and see its signed capture details (time, and location if enabled). Leave location off for photos you don't want tied to a place.
+- **The APK is a debug build.** It's fine for trying the app, but it isn't a hardened release: on a phone with USB debugging enabled, someone with physical access could read the app's private files. The signing key itself can't be extracted from the phone's security hardware.
+- **Not affiliated** with Google, Coinbase, Base, Render, Neon or GitHub. Their names are used only to describe the services this project runs on.

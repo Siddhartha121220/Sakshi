@@ -68,6 +68,16 @@ describe("malformed requests are client errors, not 500s", () => {
   });
 });
 
+describe("root", () => {
+  it("GET / describes the service instead of 404ing", async () => {
+    const app = appWith({});
+    const res = await app.inject({ method: "GET", url: "/" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ service: "Sakshi API", health: "/healthz", chainId: 31337 });
+    await app.close();
+  });
+});
+
 describe("capture ids", () => {
   it("a non-UUID id is a 404, not a 500 from the database's uuid cast", async () => {
     const app = appWith({});

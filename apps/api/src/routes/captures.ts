@@ -44,6 +44,9 @@ function captureWithContext(sql: Sql, where: ReturnType<Sql>) {
   `;
 }
 
+// A non-UUID id can't match any capture; checked up front so Postgres's uuid cast error doesn't surface as a 500.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function registerCaptureRoutes(app: FastifyInstance, ctx: AppContext) {
   app.post("/v1/captures", { preHandler: requireDeviceSignature(ctx) }, async (request, reply) => {
     const parsedBody = SubmitBodySchema.safeParse(request.body);
@@ -119,6 +122,7 @@ export function registerCaptureRoutes(app: FastifyInstance, ctx: AppContext) {
   });
 
   app.get<{ Params: { id: string } }>("/v1/captures/:id", async (request, reply) => {
+    if (!UUID.test(request.params.id)) return reply.status(404).send({ error: { code: "NOT_FOUND", message: "capture not found" } });
     const [row] = await captureWithContext(ctx.sql, ctx.sql`where c.id = ${request.params.id}`);
     return sendCaptureResponse(reply, row, ctx);
   });
@@ -135,6 +139,7 @@ export function registerCaptureRoutes(app: FastifyInstance, ctx: AppContext) {
   });
 
   app.get<{ Params: { id: string } }>("/v1/captures/:id/status", async (request, reply) => {
+    if (!UUID.test(request.params.id)) return reply.status(404).send({ error: { code: "NOT_FOUND", message: "capture not found" } });
     const [row] = await ctx.sql<{ status: BatchStatus | null; txHash: Buffer | null; anchoredAt: Date | null }[]>`
       select b.status, b.tx_hash as "txHash", b.finalized_at as "anchoredAt"
       from captures c left join anchor_batches b on b.id = c.batch_id

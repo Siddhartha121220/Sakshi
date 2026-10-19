@@ -12,7 +12,9 @@ const BodySchema = z.object({
 });
 
 export function registerVerificationEventRoutes(app: FastifyInstance, ctx: AppContext) {
-  app.post("/v1/verification-events", async (request, reply) => {
+  // Anonymous and writes a row per call: capped well below the global limit (a real verifier page sends
+  // one event per verification).
+  app.post("/v1/verification-events", { config: { rateLimit: { max: Math.min(30, ctx.config.RATE_LIMIT_PER_MINUTE), timeWindow: "1 minute" } } }, async (request, reply) => {
     const parsed = BodySchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: { code: "INVALID_BODY", message: parsed.error.message } });

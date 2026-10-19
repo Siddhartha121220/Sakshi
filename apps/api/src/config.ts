@@ -32,6 +32,15 @@ const EnvSchema = z.object({
     .default("")
     .transform((s) => s.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean)),
 
+  // Requests per minute per client IP (all routes). Anonymous write endpoints get a tighter cap on top
+  // (see app.ts). Tests that fire many requests raise this.
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
+  // Behind a reverse proxy (Render, Fly, …): how many proxy HOPS to trust, so the client IP (the rate
+  // limit key) is read from X-Forwarded-For instead of being the proxy's address for everyone. A hop
+  // COUNT, deliberately not "true": `true` trusts the leftmost address, which the client writes itself,
+  // so a forged header per request would get a fresh rate-limit bucket every time. 0 = no proxy.
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
+
   // Dev-only: skip real Key Attestation verification so a software "fake device" can register.
   // MUST be refused in production — enforced below, not just by this flag's default.
   DEV_SKIP_ATTESTATION: z

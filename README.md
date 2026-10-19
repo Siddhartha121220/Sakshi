@@ -129,7 +129,7 @@ and build it with `cd apps/android && ./gradlew :app:assembleDebug` before runni
 3. **API (Render).** Create a free **Web Service** from your fork, in the same region as the database:
    - Build command: `corepack enable && pnpm install --frozen-lockfile --prod=false`
    - Start command: `pnpm --filter api start` (the API and anchor worker in one process)
-   - Environment: `NODE_ENV=production`, `NODE_VERSION=20`, `DATABASE_URL` (direct), `SERVER_CHALLENGE_SECRET` (from `openssl rand -hex 32`), `ALLOWED_APP_CERT_DIGESTS` (your APK's signing digest), `CHAIN_ID=84532`, `RPC_URL=https://sepolia.base.org`, `SAKSHI_ANCHOR_CONTRACT` (from step 1), `ANCHORER_PRIVATE_KEY` (the wallet key), `ANCHOR_INTERVAL_MS=60000`
+   - Environment: `NODE_ENV=production`, `NODE_VERSION=20`, `DATABASE_URL` (direct), `SERVER_CHALLENGE_SECRET` (from `openssl rand -hex 32`), `ALLOWED_APP_CERT_DIGESTS` (your APK's signing digest), `CHAIN_ID=84532`, `RPC_URL=https://sepolia.base.org`, `SAKSHI_ANCHOR_CONTRACT` (from step 1), `ANCHORER_PRIVATE_KEY` (the wallet key), `ANCHOR_INTERVAL_MS=60000`, `TRUST_PROXY=1` (so rate limits apply per visitor, not to everyone behind Render's proxy)
 4. **Website (GitHub Pages).** In your fork, edit the `env` block of `.github/workflows/deploy-web.yml` (API URL, contract address, and `VITE_BASE=/<your-repo-name>/`). Then go to repo **Settings → Pages → Source: GitHub Actions** and push.
 5. **App.** Set `sakshi.apiBaseUrl` and `sakshi.verifierUrl` in `local.properties` to your Render and Pages URLs, then build. The server and verifier addresses can also be changed later in the app's **Settings** tab, with no rebuild.
 

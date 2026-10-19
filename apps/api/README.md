@@ -35,6 +35,7 @@ intended — that's what `src/server.ts` and `src/worker.ts` are for, and what p
   (`src/serve-all.ts`), for hosts with no free background workers. Listens on `$PORT`.
 - **Install with dev dependencies** (`pnpm install --prod=false`): the server runs TypeScript via `tsx`,
   and hosts that apply `NODE_ENV=production` at build time would otherwise skip it.
+- **Behind a proxy, set `TRUST_PROXY` to the hop count** (1 on Render). Without it every client shares the proxy's IP and therefore one rate-limit bucket; with `true` instead of a count, a forged `X-Forwarded-For` would get a fresh bucket per request (`test/rate-limit.test.ts`).
 - Smoke-tested in production mode against Neon on 2026-10-18 (SSL, health, beacon, challenge).
 
 ## Testing

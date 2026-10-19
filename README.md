@@ -59,7 +59,9 @@ Every photo is also saved to the phone's gallery (`Pictures/Sakshi`), so it isn'
 
 ## Try it
 
-**Install the app (Android 9+).** Ask the maintainer for `Sakshi.apk`, or build it yourself (below). It points at the live server by default. On the phone, allow "install unknown apps" for wherever you opened the file, install it, and grant camera access. It registers itself automatically.
+**Install the app (Android 9+).** [**Download Sakshi.apk**](https://github.com/Siddhartha121220/Sakshi/releases/latest/download/Sakshi.apk) — it points at the live server by default, so no setup is needed. On the phone, allow "install unknown apps" for wherever you opened the file, install it, and grant camera access. It registers itself automatically. (This is a debug build, not a Play Store release — Android will warn you it's from an unverified developer; that's expected for a student project shared this way.)
+
+You can also build it yourself from source (below).
 
 Then take a photo and watch it move through the four steps: **Signed → Uploaded → Anchored → Verified on-chain**. On the real testnet, the last step takes about 15 to 30 minutes, because a Base block only counts as final once it's settled on Ethereum.
 

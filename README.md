@@ -202,3 +202,7 @@ docs/               Design docs
 - **Fingerprints can identify a photo.** Anyone who has a copy of a photo can check whether it was registered, and see its signed capture details (time, and location if enabled). Leave location off for photos you don't want tied to a place.
 - **The APK is a debug build.** It's fine for trying the app, but it isn't a hardened release: on a phone with USB debugging enabled, someone with physical access could read the app's private files. The signing key itself can't be extracted from the phone's security hardware.
 - **Not affiliated** with Google, Coinbase, Base, Render, Neon or GitHub. Their names are used only to describe the services this project runs on.
+
+## License
+
+[MIT](LICENSE). Free to use, modify and build on, with no warranty.
